@@ -40,11 +40,13 @@ class Settings:
         _load_dotenv(root / ".env")
 
         db_path = Path(os.getenv("DB_PATH", "./data/bitrix_taxi_router.sqlite3"))
+        app_port_raw = os.getenv("APP_PORT")
+        port_raw = os.getenv("PORT")
         return cls(
             app_env=os.getenv("APP_ENV", "dev"),
             app_base_url=(os.getenv("APP_BASE_URL") or "").rstrip("/") or None,
             app_host=os.getenv("APP_HOST", "127.0.0.1"),
-            app_port=_as_int("APP_PORT", 8000),
+            app_port=int(app_port_raw or port_raw or 8000),
             db_path=(root / db_path).resolve() if not db_path.is_absolute() else db_path,
             bitrix_client_id=os.getenv("BITRIX_CLIENT_ID") or None,
             bitrix_client_secret=os.getenv("BITRIX_CLIENT_SECRET") or None,

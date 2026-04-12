@@ -27,6 +27,24 @@ python3 run.py init-db
 python3 run.py serve
 ```
 
+## Деплой на Fly.io
+
+В проект добавлены:
+
+- `Dockerfile`
+- `fly.toml`
+- `.dockerignore`
+
+Что важно:
+
+- имя приложения на Fly должно быть глобально уникальным;
+- если `bitrix-router` не создается, используйте что-то вроде `docuse-bitrix-router-prod` или `docuse-bitrix-router-01`;
+- приложение слушает `8080`;
+- health-check идет в `/health`;
+- SQLite вынесен в `/data/bitrix_taxi_router.sqlite3`, поэтому для нормальной работы нужен volume на Fly.
+
+Перед деплоем проверьте и при необходимости поменяйте строку `app = "..."` в `fly.toml`.
+
 ## Основные endpoint'ы
 
 - `GET /ui/groups` — экран настройки групп
