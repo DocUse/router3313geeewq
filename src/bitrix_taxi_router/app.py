@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from .database import Database
 from .service import AssignmentService, group_input_from_payload
 from .settings import Settings
-from .ui import render_settings_page
+from .ui import render_install_page, render_settings_page
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -71,6 +71,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/install", response_class=HTMLResponse)
+    async def install_page_get(request: Request) -> str:
+        member_id = (request.query_params.get("member_id") or "").strip() or None
+        return render_install_page(initial_member_id=member_id)
+
+    @app.head("/install")
+    async def install_page_head() -> dict[str, str]:
+        return {}
+
+    @app.post("/install", response_class=HTMLResponse)
+    async def install_page_post(request: Request) -> str:
+        payload = _normalize_bitrix_payload(await _read_bitrix_payload(request))
+        member_id = _extract_member_id_from_context(payload)
+        status_message = "Контекст портала получен."
+        if member_id and _payload_contains_installable_auth(payload):
+            try:
+                saved = service.install_portal(payload)
+                registered = service.register_default_event_handlers(saved["member_id"])
+                registered_text = ", ".join(registered) if registered else "без регистрации событий"
+                status_message = f"Портал подключен: {saved['member_id']}. События: {registered_text}."
+            except Exception as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return render_install_page(initial_member_id=member_id, status_message=status_message)
 
     @app.get("/install/callback", response_class=HTMLResponse)
     async def install_callback_get() -> str:

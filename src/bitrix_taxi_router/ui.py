@@ -520,3 +520,127 @@ def render_settings_page(*, initial_member_id: str | None = None, portal_message
         .replace("__INITIAL_MEMBER_ID__", initial_member_id_json)
         .replace("__PORTAL_MESSAGE__", portal_message_json)
     )
+
+
+def render_install_page(*, initial_member_id: str | None = None, status_message: str | None = None) -> str:
+    initial_member_id_json = json.dumps(initial_member_id or "", ensure_ascii=False)
+    status_message_json = json.dumps(status_message or "", ensure_ascii=False)
+    template = """
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bitrix Taxi Router Installation</title>
+  <script src="//api.bitrix24.tech/api/v1/"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fb;
+      color: #111827;
+    }
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      padding: 24px;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+    }
+    p {
+      margin: 0 0 14px;
+      line-height: 1.5;
+    }
+    .muted {
+      color: #6b7280;
+    }
+    .status {
+      margin: 16px 0;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #ecfdf5;
+      color: #047857;
+      min-height: 20px;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    a, button {
+      display: inline-block;
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 15px;
+      text-decoration: none;
+      font: inherit;
+      cursor: pointer;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+    }
+    a.secondary, button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Установка Bitrix Taxi Router</h1>
+      <p>Приложение подключено к вашему Bitrix24. Следующий шаг — завершить установку и открыть экран настроек.</p>
+      <p class="muted">После завершения вы сможете выбрать рекрутеров, указать первый этап и настроить таймер передачи лида следующему сотруднику.</p>
+      <div id="status" class="status"></div>
+      <div class="actions">
+        <button id="finishInstallButton" type="button">Завершить установку</button>
+        <a id="openSettingsLink" class="secondary" href="/ui/groups">Открыть настройки</a>
+      </div>
+    </div>
+  </div>
+  <script>
+    const initialMemberId = __INITIAL_MEMBER_ID__;
+    const statusMessage = __STATUS_MESSAGE__;
+    const statusNode = document.getElementById("status");
+    const openSettingsLink = document.getElementById("openSettingsLink");
+    const finishInstallButton = document.getElementById("finishInstallButton");
+
+    function updateStatus(message, isError = false) {
+      statusNode.textContent = message;
+      statusNode.style.background = isError ? "#fef2f2" : "#ecfdf5";
+      statusNode.style.color = isError ? "#b91c1c" : "#047857";
+    }
+
+    const settingsUrl = initialMemberId ? `/ui/groups?member_id=${encodeURIComponent(initialMemberId)}` : "/ui/groups";
+    openSettingsLink.href = settingsUrl;
+    updateStatus(statusMessage || "Контекст портала сохранен. Нажмите кнопку ниже, чтобы Bitrix завершил установку.");
+
+    finishInstallButton.addEventListener("click", function () {
+      if (window.BX24 && typeof window.BX24.installFinish === "function") {
+        updateStatus("Сообщаем Bitrix24, что установка завершена...");
+        window.BX24.installFinish();
+        window.setTimeout(function () {
+          window.location.href = settingsUrl;
+        }, 600);
+        return;
+      }
+      updateStatus("BX24 SDK не найден. Откройте настройки вручную по кнопке ниже.", true);
+    });
+  </script>
+</body>
+</html>
+"""
+    return (
+        template
+        .replace("__INITIAL_MEMBER_ID__", initial_member_id_json)
+        .replace("__STATUS_MESSAGE__", status_message_json)
+    )
