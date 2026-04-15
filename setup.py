@@ -5,7 +5,7 @@ if __name__ == "__main__":
     setup(
         name="bitrix-taxi-router",
         version="0.1.0",
-        description="Bitrix24 lead distribution with timed reassignment",
+        description="Minimal Bitrix24 app skeleton",
         package_dir={"": "src"},
         packages=find_packages("src"),
         install_requires=["fastapi", "uvicorn"],

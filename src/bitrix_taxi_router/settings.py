@@ -17,22 +17,12 @@ def _load_dotenv(dotenv_path: Path) -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-def _as_int(name: str, default: int) -> int:
-    raw_value = os.getenv(name)
-    if raw_value in (None, ""):
-        return default
-    return int(raw_value)
-
-
 @dataclass
 class Settings:
     app_env: str
-    app_base_url: str | None
     app_host: str
     app_port: int
     db_path: Path
-    bitrix_client_id: str | None
-    bitrix_client_secret: str | None
 
     @classmethod
     def load(cls, base_dir: Path | None = None) -> "Settings":
@@ -44,12 +34,9 @@ class Settings:
         port_raw = os.getenv("PORT")
         return cls(
             app_env=os.getenv("APP_ENV", "dev"),
-            app_base_url=(os.getenv("APP_BASE_URL") or "").rstrip("/") or None,
             app_host=os.getenv("APP_HOST", "127.0.0.1"),
             app_port=int(app_port_raw or port_raw or 8000),
             db_path=(root / db_path).resolve() if not db_path.is_absolute() else db_path,
-            bitrix_client_id=os.getenv("BITRIX_CLIENT_ID") or None,
-            bitrix_client_secret=os.getenv("BITRIX_CLIENT_SECRET") or None,
         )
 
     def ensure_runtime_dirs(self) -> None:

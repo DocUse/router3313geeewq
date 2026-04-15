@@ -7,9 +7,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .database import Database
-from .service import AssignmentService, group_input_from_payload
+from .service import PortalService
 from .settings import Settings
-from .ui import render_install_page, render_settings_page
+from .ui import render_blank_page, render_install_page
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -18,38 +18,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     database = Database(effective_settings.db_path)
     database.init_schema()
-    service = AssignmentService(database, effective_settings)
+    service = PortalService(database)
 
     app = FastAPI(title="Bitrix Taxi Router")
     app.state.settings = effective_settings
     app.state.database = database
-    app.state.assignment_service = service
+    app.state.portal_service = service
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> str:
-        return """
-        <html>
-          <head><title>Bitrix Taxi Router</title></head>
-          <body>
-            <h1>Bitrix Taxi Router</h1>
-            <p>Сервер запущен. Используйте API для установки портала, настройки групп и запуска перераспределения.</p>
-            <ul>
-              <li><a href="/ui/groups">/ui/groups</a> — экран настройки групп</li>
-              <li>POST /install/callback</li>
-              <li>POST /events/bitrix</li>
-              <li>GET /api/groups?member_id=...</li>
-              <li>POST /api/groups</li>
-              <li>GET /api/employees?member_id=...</li>
-              <li>POST /api/jobs/reassign</li>
-            </ul>
-          </body>
-        </html>
-        """
+        return render_blank_page()
 
     @app.get("/ui/groups", response_class=HTMLResponse)
     async def groups_ui_get(request: Request) -> str:
-        member_id = (request.query_params.get("member_id") or "").strip() or None
-        return render_settings_page(initial_member_id=member_id)
+        _ = request
+        return render_blank_page()
 
     @app.head("/ui/groups")
     async def groups_ui_head() -> dict[str, str]:
@@ -58,15 +41,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/ui/groups", response_class=HTMLResponse)
     async def groups_ui_post(request: Request) -> str:
         payload = _normalize_bitrix_payload(await _read_bitrix_payload(request))
-        member_id = _extract_member_id_from_context(payload)
-        message = None
-        if member_id and _payload_contains_installable_auth(payload):
+        if _payload_contains_installable_auth(payload):
             try:
-                saved = service.install_portal(payload)
-                message = f"Контекст портала сохранен: {saved['domain']}"
+                service.install_portal(payload)
             except Exception as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return render_settings_page(initial_member_id=member_id, portal_message=message)
+        return render_blank_page()
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -85,20 +65,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def install_page_post(request: Request) -> str:
         payload = _normalize_bitrix_payload(await _read_bitrix_payload(request))
         member_id = _extract_member_id_from_context(payload)
-        status_message = "Контекст портала получен."
-        if member_id and _payload_contains_installable_auth(payload):
+        if _payload_contains_installable_auth(payload):
             try:
-                saved = service.install_portal(payload)
-                registered = service.register_default_event_handlers(saved["member_id"])
-                registered_text = ", ".join(registered) if registered else "без регистрации событий"
-                status_message = f"Портал подключен: {saved['member_id']}. События: {registered_text}."
+                service.install_portal(payload)
             except Exception as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return render_install_page(initial_member_id=member_id, status_message=status_message)
+        return render_install_page(initial_member_id=member_id)
 
     @app.get("/install/callback", response_class=HTMLResponse)
     async def install_callback_get() -> str:
-        return "Bitrix install callback is ready."
+        return "ready"
 
     @app.head("/install/callback")
     async def install_callback_head() -> dict[str, str]:
@@ -109,58 +85,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         payload = _normalize_bitrix_payload(await _read_bitrix_payload(request))
         try:
             saved = service.install_portal(payload)
-            registered = service.register_default_event_handlers(saved["member_id"])
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {"status": "ok", "portal": saved, "registered_events": registered}
-
-    @app.post("/events/bitrix")
-    async def bitrix_event(request: Request) -> dict[str, object]:
-        payload = await _read_bitrix_payload(request)
-        try:
-            return service.process_event(payload)
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @app.get("/api/groups")
-    async def list_groups(member_id: str) -> list[dict[str, object]]:
-        try:
-            return service.list_groups(member_id)
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @app.post("/api/groups")
-    async def save_group(request: Request) -> dict[str, object]:
-        payload = await request.json()
-        try:
-            group_id = service.save_group(group_input_from_payload(payload))
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {"status": "ok", "group_id": group_id}
-
-    @app.delete("/api/groups/{group_id}")
-    async def delete_group(group_id: int, member_id: str) -> dict[str, object]:
-        try:
-            deleted = service.delete_group(member_id, group_id)
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if not deleted:
-            raise HTTPException(status_code=404, detail="Group not found")
-        return {"status": "ok", "group_id": group_id}
-
-    @app.get("/api/employees")
-    async def list_employees(member_id: str) -> list[dict[str, object]]:
-        try:
-            return service.list_portal_employees(member_id)
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @app.post("/api/jobs/reassign")
-    async def run_reassign_job() -> dict[str, object]:
-        try:
-            return service.process_due_reassignments()
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"status": "ok", "portal": saved}
 
     return app
 

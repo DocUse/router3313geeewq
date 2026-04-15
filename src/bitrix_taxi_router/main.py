@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 
 from .app import create_app
 from .database import Database
-from .service import AssignmentService
 from .settings import Settings
 
 
@@ -14,7 +12,6 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("init-db", help="Initialize sqlite schema")
-    subparsers.add_parser("reassign-once", help="Run timed reassignment worker once")
 
     serve = subparsers.add_parser("serve", help="Run HTTP API")
     serve.add_argument("--host")
@@ -33,12 +30,6 @@ def main() -> None:
     if args.command == "init-db":
         database.init_schema()
         print(f"Initialized database at {settings.db_path}")
-        return
-
-    if args.command == "reassign-once":
-        database.init_schema()
-        service = AssignmentService(database, settings)
-        print(json.dumps(service.process_due_reassignments(), ensure_ascii=False, indent=2))
         return
 
     if args.command == "serve":
