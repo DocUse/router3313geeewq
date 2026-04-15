@@ -152,6 +152,24 @@ def render_blank_page() -> str:
       justify-content: flex-start;
     }
 
+    .canvas-card.is-centered {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border-style: solid;
+      border-color: transparent;
+      background: #ffffff;
+    }
+
+    .distribution-empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 100%;
+    }
+
     .canvas-title {
       margin: 0;
       font-size: 32px;
@@ -179,6 +197,36 @@ def render_blank_page() -> str:
       font-size: 13px;
       font-weight: 600;
       letter-spacing: 0.01em;
+    }
+
+    .distribution-empty-title {
+      margin: 0 0 18px;
+      font-size: 24px;
+      line-height: 1.3;
+      font-weight: 700;
+      color: #333333;
+    }
+
+    .primary-action {
+      min-width: 226px;
+      height: 42px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--brand-blue);
+      color: #ffffff;
+      font: inherit;
+      font-size: 18px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .primary-action:hover {
+      opacity: 0.92;
+    }
+
+    .section-panel[hidden] {
+      display: none;
     }
 
     @media (max-width: 900px) {
@@ -271,11 +319,20 @@ def render_blank_page() -> str:
 
     <main class="canvas">
       <section class="canvas-card" aria-live="polite">
-        <span class="section-badge" id="sectionBadge">Раздел</span>
-        <h2 class="canvas-title" id="sectionTitle">Общая информация</h2>
-        <p class="canvas-subtitle" id="sectionDescription">
-          Стартовый экран приложения. Здесь пока нет бизнес-логики, только базовый каркас интерфейса для дальнейшей разработки.
-        </p>
+        <div class="section-panel" id="defaultPanel">
+          <span class="section-badge" id="sectionBadge">Раздел</span>
+          <h2 class="canvas-title" id="sectionTitle">Общая информация</h2>
+          <p class="canvas-subtitle" id="sectionDescription">
+            Собираем общую информацию. Пока собрали только то, что её нет.
+          </p>
+        </div>
+
+        <div class="section-panel" id="distributionPanel" hidden>
+          <div class="distribution-empty-state">
+            <h2 class="distribution-empty-title">Создать группу распределения</h2>
+            <button class="primary-action" type="button">Создать</button>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -285,35 +342,46 @@ def render_blank_page() -> str:
       overview: {
         badge: "Раздел",
         title: "Общая информация",
-        description: "Стартовый экран приложения. Здесь пока нет бизнес-логики, только базовый каркас интерфейса для дальнейшей разработки.",
+        description: "Собираем общую информацию. Пока собрали только то, что её нет.",
       },
       distribution: {
         badge: "Раздел",
         title: "Распределение сделок",
-        description: "Пустой рабочий экран под будущую механику распределения. Сейчас это только навигационный раздел без действий и данных.",
+        description: "",
       },
       stats: {
         badge: "Раздел",
         title: "Статистика",
-        description: "Заготовка под аналитику и метрики. Раздел уже переключается из меню, но остается чистым холстом.",
+        description: "График посещений: Рисуем прямую линию по нулям карандашом на мониторе.",
       },
       settings: {
         badge: "Раздел",
         title: "Настройки",
-        description: "Стартовая точка для будущих конфигураций приложения. Пока здесь нет форм и настроек, только структура интерфейса.",
+        description: "Конфигурация пространства-времени. Пока настроено только пространство. Времени на настройку не хватило.",
       },
     };
 
+    const defaultPanel = document.getElementById("defaultPanel");
+    const distributionPanel = document.getElementById("distributionPanel");
     const sectionBadge = document.getElementById("sectionBadge");
     const sectionTitle = document.getElementById("sectionTitle");
     const sectionDescription = document.getElementById("sectionDescription");
+    const mainCard = document.querySelector(".canvas > .canvas-card");
     const menuButtons = document.querySelectorAll("[data-view]");
 
     function setActiveView(view) {
       const content = sectionContent[view] || sectionContent.overview;
-      sectionBadge.textContent = content.badge;
-      sectionTitle.textContent = content.title;
-      sectionDescription.textContent = content.description;
+      const isDistribution = view === "distribution";
+
+      defaultPanel.hidden = isDistribution;
+      distributionPanel.hidden = !isDistribution;
+      mainCard.classList.toggle("is-centered", isDistribution);
+
+      if (!isDistribution) {
+        sectionBadge.textContent = content.badge;
+        sectionTitle.textContent = content.title;
+        sectionDescription.textContent = content.description;
+      }
 
       menuButtons.forEach((button) => {
         button.classList.toggle("is-active", button.dataset.view === view);
