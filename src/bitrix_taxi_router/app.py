@@ -33,8 +33,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/ui/groups", response_class=HTMLResponse)
     async def groups_ui_get(request: Request) -> str:
-        _ = request
-        return render_blank_page()
+        member_id = (request.query_params.get("member_id") or "").strip() or None
+        return render_blank_page(initial_member_id=member_id)
 
     @app.head("/ui/groups")
     async def groups_ui_head() -> dict[str, str]:
@@ -43,12 +43,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/ui/groups", response_class=HTMLResponse)
     async def groups_ui_post(request: Request) -> str:
         payload = _normalize_bitrix_payload(await _read_bitrix_payload(request))
+        member_id = _extract_member_id_from_context(payload)
         if _payload_contains_installable_auth(payload):
             try:
                 service.install_portal(payload)
             except Exception as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return render_blank_page()
+        return render_blank_page(initial_member_id=member_id)
 
     @app.get("/api/ui/groups/reference-data")
     async def groups_reference_data(request: Request) -> dict[str, object]:

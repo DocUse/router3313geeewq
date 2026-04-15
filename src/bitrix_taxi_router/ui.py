@@ -3,14 +3,16 @@ from __future__ import annotations
 import json
 
 
-def render_blank_page() -> str:
-    return """
+def render_blank_page(*, initial_member_id: str | None = None) -> str:
+    initial_member_id_json = json.dumps(initial_member_id or "", ensure_ascii=False)
+    template = """
 <!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NaimTech | Распределение</title>
+  <script src="//api.bitrix24.tech/api/v1/"></script>
   <style>
     :root {
       color-scheme: light;
@@ -225,6 +227,10 @@ def render_blank_page() -> str:
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 18px;
+    }
+
+    .reference-grid[hidden] {
+      display: none;
     }
 
     .reference-card {
@@ -564,10 +570,11 @@ def render_blank_page() -> str:
     const usersList = document.getElementById("usersList");
     const stagesList = document.getElementById("stagesList");
     const fieldsList = document.getElementById("fieldsList");
-    const distributionMemberId = new URLSearchParams(window.location.search).get("member_id") || "";
+    const initialDistributionMemberId = __INITIAL_MEMBER_ID__;
     const distributionState = {
       isLoaded: false,
       isLoading: false,
+      memberId: initialDistributionMemberId || new URLSearchParams(window.location.search).get("member_id") || "",
     };
 
     function setDistributionStatus(message, tone) {
@@ -663,15 +670,45 @@ def render_blank_page() -> str:
       );
     }
 
+    function getBitrixMemberId() {
+      return new Promise((resolve) => {
+        if (!window.BX24 || typeof window.BX24.init !== "function" || typeof window.BX24.getAuth !== "function") {
+          resolve("");
+          return;
+        }
+
+        try {
+          window.BX24.init(() => {
+            const auth = window.BX24.getAuth();
+            resolve((auth && auth.member_id) || "");
+          });
+        } catch (error) {
+          console.error("BX24 auth initialization failed", error);
+          resolve("");
+        }
+      });
+    }
+
+    async function resolveDistributionMemberId() {
+      if (distributionState.memberId) {
+        return distributionState.memberId;
+      }
+
+      const bitrixMemberId = await getBitrixMemberId();
+      distributionState.memberId = bitrixMemberId || "";
+      return distributionState.memberId;
+    }
+
     async function loadDistributionReferenceData() {
       if (distributionState.isLoaded || distributionState.isLoading) {
         return;
       }
 
+      const distributionMemberId = await resolveDistributionMemberId();
       if (!distributionMemberId) {
         distributionReferenceGrid.hidden = true;
         setDistributionStatus(
-          "Не найден member_id установленного портала. Откройте приложение через Bitrix24, чтобы загрузить реальные справочники.",
+          "Не удалось определить member_id портала. Откройте приложение внутри Bitrix24 или завершите повторную установку, чтобы загрузить реальные справочники.",
           "is-error"
         );
         return;
@@ -727,6 +764,7 @@ def render_blank_page() -> str:
 </body>
 </html>
 """
+    return template.replace("__INITIAL_MEMBER_ID__", initial_member_id_json)
 
 
 def render_install_page(*, initial_member_id: str | None = None) -> str:
