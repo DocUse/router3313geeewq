@@ -35,3 +35,7 @@ python3 run.py serve
 - `GET` / `POST /install/callback` — технический маршрут установки;
 - `GET` / `POST /ui/groups` — пустой белый UI-холст;
 - `GET /` — такой же минимальный пустой экран.
+
+## Спецификации
+
+- [`distribution_deals_spec.md`](distribution_deals_spec.md) — подробное описание раздела `Распределение сделок`, его полей и логики работы перед реализацией.

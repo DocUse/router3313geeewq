@@ -326,53 +326,45 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
     .distribution-form {
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 12px;
     }
 
     .distribution-form[hidden] {
       display: none;
     }
 
-    .distribution-form-grid {
+    .distribution-row {
       display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-      gap: 18px;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 12px;
       align-items: start;
-    }
-
-    .distribution-section {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      padding: 20px;
-      border: 1px solid var(--border-soft);
-      border-radius: 18px;
+      padding: 3px 8px 8px 0;
+      border: 1px solid #ecf1f9;
+      border-radius: 10px;
       background: #ffffff;
     }
 
-    .distribution-section--wide {
-      grid-column: 1 / -1;
+    .distribution-row--simple {
+      align-items: center;
+      min-height: 47px;
+      padding-bottom: 3px;
     }
 
-    .distribution-section-title {
-      margin: 0;
-      font-size: 20px;
+    .distribution-row-label {
+      display: flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 8px 0 8px 18px;
+      font-size: 16px;
       line-height: 1.3;
       font-weight: 700;
-      color: #1f2a44;
+      color: #333333;
+      word-break: break-word;
     }
 
-    .distribution-section-description {
-      margin: 0;
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--canvas-subtle);
-    }
-
-    .distribution-fields-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px;
+    .distribution-row-control {
+      min-width: 0;
+      padding-top: 5px;
     }
 
     .distribution-field {
@@ -382,35 +374,40 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
       min-width: 0;
     }
 
-    .distribution-field--full {
-      grid-column: 1 / -1;
+    .distribution-label,
+    .distribution-inline-label {
+      font-size: 16px;
+      line-height: 1.3;
+      font-weight: 500;
+      color: #333333;
     }
 
-    .distribution-label {
-      font-size: 14px;
-      line-height: 1.4;
-      font-weight: 600;
-      color: #24324f;
-    }
-
-    .distribution-hint {
+    .distribution-section-description {
       margin: 0;
-      font-size: 13px;
-      line-height: 1.5;
-      color: #7081a8;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #5c5c5c;
     }
 
     .distribution-input,
     .distribution-select {
       width: 100%;
-      min-height: 42px;
-      padding: 10px 12px;
-      border: 1px solid var(--border-soft);
-      border-radius: 12px;
+      height: 38px;
+      padding: 8px 18px;
+      border: 2px solid #cdd6ea;
+      border-radius: 10px;
       background: #ffffff;
-      color: #24324f;
+      color: #333333;
       font: inherit;
-      font-size: 14px;
+      font-size: 16px;
+      opacity: 0.8;
+    }
+
+    .distribution-input--compact {
+      width: 65px;
+      padding-left: 12px;
+      padding-right: 12px;
+      text-align: center;
     }
 
     .distribution-input:disabled,
@@ -435,23 +432,31 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
       margin: 0;
     }
 
-    .bulk-limit-row {
-      display: grid;
-      grid-template-columns: minmax(0, 180px) minmax(0, 120px) auto;
-      gap: 12px;
-      align-items: end;
+    .participants-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-top: 3px;
+    }
+
+    .participants-toolbar .distribution-select {
+      width: 138px;
+      padding-left: 12px;
+      padding-right: 12px;
     }
 
     .secondary-action {
-      min-width: 120px;
-      height: 42px;
-      border: 1px solid rgba(46, 123, 244, 0.18);
+      min-width: 111px;
+      height: 38px;
+      border: 0;
       border-radius: 10px;
-      background: #f8fbff;
-      color: var(--brand-blue);
+      background: var(--brand-blue);
+      color: #ffffff;
       font: inherit;
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 18px;
+      font-weight: 500;
       cursor: pointer;
     }
 
@@ -464,13 +469,14 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
 
     .distribution-scroll-box {
       border: 1px solid var(--border-soft);
-      border-radius: 14px;
+      border-radius: 10px;
       background: #fbfbfe;
-      padding: 8px 10px;
+      padding: 8px 18px;
       overflow-y: auto;
     }
 
     .distribution-scroll-box--participants {
+      min-height: 112px;
       max-height: 170px;
     }
 
@@ -480,16 +486,19 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
 
     .load-stages-layout {
       display: grid;
-      grid-template-columns: 280px minmax(0, 1fr);
+      grid-template-columns: 296px minmax(0, 1fr);
       gap: 16px;
       align-items: start;
     }
 
     .load-stages-note {
       border: 1px solid var(--border-soft);
-      border-radius: 14px;
+      border-radius: 10px;
       background: #fbfbfe;
-      padding: 14px 12px;
+      padding: 12px;
+      min-height: 78px;
+      display: flex;
+      align-items: center;
     }
 
     .participant-row,
@@ -497,14 +506,14 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
       display: grid;
       gap: 12px;
       align-items: center;
-      padding: 12px 14px;
-      border: 1px solid rgba(46, 123, 244, 0.08);
-      border-radius: 14px;
-      background: #f7faff;
+      padding: 3px 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
     }
 
     .participant-row {
-      grid-template-columns: minmax(0, 1fr) 140px;
+      grid-template-columns: minmax(0, 1fr) 65px;
     }
 
     .participant-main,
@@ -517,10 +526,10 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
 
     .participant-main input,
     .checkbox-main input {
-      width: 16px;
-      height: 16px;
-      margin-top: 2px;
-      flex: 0 0 16px;
+      width: 20px;
+      height: 20px;
+      margin-top: 0;
+      flex: 0 0 20px;
     }
 
     .participant-info,
@@ -533,10 +542,10 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
 
     .participant-name,
     .checkbox-name {
-      font-size: 14px;
+      font-size: 16px;
       line-height: 1.4;
-      font-weight: 600;
-      color: #24324f;
+      font-weight: 500;
+      color: #333333;
       word-break: break-word;
     }
 
@@ -551,19 +560,15 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
     .participant-limit {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 0;
     }
 
     .participant-limit-label {
-      font-size: 12px;
-      line-height: 1.3;
-      color: #7081a8;
-      font-weight: 600;
+      display: none;
     }
 
     .distribution-actions {
-      display: flex;
-      justify-content: flex-end;
+      display: block;
     }
 
     .canvas-title {
@@ -604,7 +609,8 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
     }
 
     .primary-action {
-      min-width: 226px;
+      width: 100%;
+      min-width: 0;
       height: 42px;
       border: 0;
       border-radius: 10px;
@@ -619,6 +625,10 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
 
     .primary-action:hover {
       opacity: 0.92;
+    }
+
+    .distribution-form-hidden-fields[hidden] {
+      display: none;
     }
 
     .section-panel[hidden] {
@@ -655,12 +665,19 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
         grid-template-columns: 1fr;
       }
 
-      .distribution-form-grid,
-      .distribution-fields-grid,
-      .bulk-limit-row,
+      .distribution-row,
       .participant-row,
       .load-stages-layout {
         grid-template-columns: 1fr;
+      }
+
+      .distribution-row {
+        padding: 8px;
+      }
+
+      .distribution-row-label,
+      .distribution-row-control {
+        padding: 0;
       }
     }
   </style>
@@ -750,84 +767,60 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
             </div>
 
             <form class="distribution-form" id="distributionForm" hidden>
-              <section class="distribution-section distribution-section--wide" aria-labelledby="generalConfigTitle">
-                <h3 class="distribution-section-title" id="generalConfigTitle">Основные настройки</h3>
-                <div class="distribution-fields-grid">
-                  <label class="distribution-field distribution-field--full">
-                    <span class="distribution-label">Наименование группы распределения</span>
-                    <input class="distribution-input" id="groupNameInput" type="text" placeholder="Например, Основная группа распределения">
-                  </label>
+              <label class="distribution-row distribution-row--simple">
+                <span class="distribution-row-label">Наименование группы распределения:</span>
+                <span class="distribution-row-control">
+                  <input class="distribution-input" id="groupNameInput" type="text" placeholder="Например, Основная группа распределения">
+                </span>
+              </label>
 
-                  <label class="distribution-field">
-                    <span class="distribution-label">Тип распределения</span>
-                    <select class="distribution-select" id="distributionTypeSelect">
-                      <option value="round_robin_load_time">По очереди с лимитами по нагрузке и времени</option>
+              <label class="distribution-row distribution-row--simple">
+                <span class="distribution-row-label">Тип распределения:</span>
+                <span class="distribution-row-control">
+                  <select class="distribution-select" id="distributionTypeSelect">
+                    <option value="round_robin_load_time">По очереди с лимитами по нагрузке и времени</option>
+                  </select>
+                </span>
+              </label>
+
+              <section class="distribution-row" aria-label="Участники распределения">
+                <div class="distribution-row-label">Участники распределения:</div>
+                <div class="distribution-row-control">
+                  <div class="participants-toolbar">
+                    <span class="distribution-inline-label">Массовое заполнение лимита для:</span>
+                    <select class="distribution-select" id="bulkLimitScopeSelect">
+                      <option value="selected">Выбранных</option>
+                      <option value="all">Всех</option>
                     </select>
-                  </label>
-
-                  <label class="distribution-field">
-                    <span class="distribution-label">Отслеживаемое событие</span>
-                    <select class="distribution-select" id="eventTypeSelect">
-                      <option value="deal_created">Создание новой сделки</option>
-                    </select>
-                  </label>
-
-                  <label class="distribution-field">
-                    <span class="distribution-label">Статус для распределения</span>
-                    <select class="distribution-select" id="distributionStageSelect"></select>
-                  </label>
-
-                  <label class="distribution-field">
-                    <span class="distribution-label">Поле для установки ответственного</span>
-                    <select class="distribution-select" id="responsibleFieldSelect"></select>
-                  </label>
-
-                  <label class="distribution-field">
-                    <span class="distribution-label">Время ожидания в секундах</span>
-                    <input class="distribution-input" id="waitSecondsInput" type="number" min="1" step="1" placeholder="Например, 120">
-                  </label>
-
-                  <label class="distribution-field">
-                    <span class="distribution-label">Интервал перепроверки при переполнении лимитов</span>
-                    <input class="distribution-input" id="retryIntervalInput" type="number" min="1" step="1" placeholder="Например, 30">
-                  </label>
-
-                  <label class="distribution-field distribution-field--full">
-                    <span class="distribution-toggle">
-                      <input id="groupActiveInput" type="checkbox">
-                      <span>Группа активна</span>
-                    </span>
-                  </label>
-                </div>
-              </section>
-
-              <div class="distribution-form-grid">
-                <section class="distribution-section" aria-labelledby="membersConfigTitle">
-                  <h3 class="distribution-section-title" id="membersConfigTitle">Участники распределения</h3>
-                  <p class="distribution-section-description">
-                    Выберите сотрудников, которые участвуют в распределении, и задайте для каждого индивидуальный лимит.
-                  </p>
-                  <div class="bulk-limit-row">
-                    <label class="distribution-field">
-                      <span class="distribution-label">Массовое заполнение лимита</span>
-                      <select class="distribution-select" id="bulkLimitScopeSelect">
-                        <option value="selected">Выбранных</option>
-                        <option value="all">Всех</option>
-                      </select>
-                    </label>
-                    <label class="distribution-field">
-                      <span class="distribution-label">Лимит</span>
-                      <input class="distribution-input" id="bulkLimitValueInput" type="number" min="0" step="1" placeholder="0">
-                    </label>
+                    <span class="distribution-inline-label">Лимит:</span>
+                    <input class="distribution-input distribution-input--compact" id="bulkLimitValueInput" type="number" min="0" step="1" placeholder="0">
                     <button class="secondary-action" id="applyBulkLimitButton" type="button">Применить</button>
                   </div>
                   <div class="distribution-scroll-box distribution-scroll-box--participants">
                     <div class="participant-list" id="participantsList"></div>
                   </div>
-                </section>
+                </div>
+              </section>
 
-                <section class="distribution-section" aria-labelledby="loadStagesTitle">
-                  <h3 class="distribution-section-title" id="loadStagesTitle">Статусы для определения нагрузки</h3>
+              <label class="distribution-row distribution-row--simple">
+                <span class="distribution-row-label">Отслеживаемое событие:</span>
+                <span class="distribution-row-control">
+                  <select class="distribution-select" id="eventTypeSelect">
+                    <option value="deal_created">Создание новой сделки</option>
+                  </select>
+                </span>
+              </label>
+
+              <label class="distribution-row distribution-row--simple">
+                <span class="distribution-row-label">Статус для распределения:</span>
+                <span class="distribution-row-control">
+                  <select class="distribution-select" id="distributionStageSelect"></select>
+                </span>
+              </label>
+
+              <section class="distribution-row" aria-labelledby="loadStagesTitle">
+                <div class="distribution-row-label" id="loadStagesTitle">Статусы для определения нагрузки:</div>
+                <div class="distribution-row-control">
                   <div class="load-stages-layout">
                     <div class="load-stages-note">
                       <p class="distribution-section-description">
@@ -839,7 +832,34 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
                       <div class="checkbox-list" id="loadStagesList"></div>
                     </div>
                   </div>
-                </section>
+                </div>
+              </section>
+
+              <label class="distribution-row distribution-row--simple">
+                <span class="distribution-row-label">Поле для установки/определения ответственного:</span>
+                <span class="distribution-row-control">
+                  <select class="distribution-select" id="responsibleFieldSelect"></select>
+                </span>
+              </label>
+
+              <label class="distribution-row distribution-row--simple">
+                <span class="distribution-row-label">Время ожидания, сек</span>
+                <span class="distribution-row-control">
+                  <input class="distribution-input" id="waitSecondsInput" type="number" min="1" step="1" placeholder="0">
+                </span>
+              </label>
+
+              <div class="distribution-form-hidden-fields" hidden>
+                <label class="distribution-field">
+                  <span class="distribution-label">Интервал перепроверки при переполнении лимитов</span>
+                  <input class="distribution-input" id="retryIntervalInput" type="number" min="1" step="1" placeholder="Например, 30">
+                </label>
+                <label class="distribution-field">
+                  <span class="distribution-toggle">
+                    <input id="groupActiveInput" type="checkbox">
+                    <span>Группа активна</span>
+                  </span>
+                </label>
               </div>
 
               <div class="distribution-actions">
