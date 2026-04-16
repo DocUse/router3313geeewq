@@ -17,6 +17,30 @@ from bitrix_taxi_router.app import create_app
 from bitrix_taxi_router.settings import Settings
 
 
+class FakeBitrixClient:
+    def __init__(self, responses: dict[str, object]) -> None:
+        self.responses = responses
+        self.calls: list[tuple[str, str, dict[str, object] | None]] = []
+
+    def call(self, method: str, params: dict[str, object] | None = None) -> dict[str, object]:
+        self.calls.append(("call", method, params))
+        response = self.responses.get(method)
+        if callable(response):
+            response = response(params)
+        if not isinstance(response, dict):
+            raise AssertionError(f"Expected dict response for {method}")
+        return response
+
+    def call_list(self, method: str, params: dict[str, object] | None = None) -> list[dict[str, object]]:
+        self.calls.append(("call_list", method, params))
+        response = self.responses.get(method)
+        if callable(response):
+            response = response(params)
+        if not isinstance(response, list):
+            raise AssertionError(f"Expected list response for {method}")
+        return response
+
+
 class AppUiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -146,6 +170,105 @@ class AppUiTests(unittest.TestCase):
             ],
             get_response.json()["config"]["members"],
         )
+
+    def test_distribution_group_config_endpoint_binds_event_for_public_https_request(self) -> None:
+        fake_client = FakeBitrixClient(
+            {
+                "event.get": {"result": []},
+                "event.bind": {"result": True},
+            }
+        )
+        self.client.app.state.portal_service.bitrix_client_factory = lambda portal: fake_client
+        self.client.post(
+            "/api/ui/groups/portal-context",
+            json={
+                "AUTH_ID": "token-1",
+                "REFRESH_ID": "refresh-1",
+                "DOMAIN": "portal.example.bitrix24.ru",
+                "PROTOCOL": "1",
+                "member_id": "portal-789",
+            },
+        )
+
+        response = self.client.post(
+            "/api/ui/groups/config?member_id=portal-789",
+            headers={
+                "x-forwarded-proto": "https",
+                "x-forwarded-host": "router.example.com",
+            },
+            json={
+                "name": "Основная группа",
+                "distribution_type": "round_robin_load_time",
+                "event_type": "deal_created",
+                "distribution_stage_id": "NEW",
+                "load_stage_ids": ["NEW"],
+                "responsible_field_id": "ASSIGNED_BY_ID",
+                "wait_seconds": 120,
+                "retry_interval_seconds": 30,
+                "is_active": True,
+                "members": [{"user_id": "10", "limit": 3}],
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            {
+                "event": "ONCRMDEALADD",
+                "handler": "https://router.example.com/api/bitrix/events",
+                "already_bound": False,
+                "bound": True,
+            },
+            response.json()["event_binding"],
+        )
+
+    def test_bitrix_event_endpoint_assigns_deal(self) -> None:
+        fake_client = FakeBitrixClient(
+            {
+                "crm.item.get": {"result": {"item": {"id": 700, "stageId": "NEW"}}},
+                "crm.item.list": [],
+                "crm.item.update": {"result": {"item": {"id": 700}}},
+            }
+        )
+        self.client.app.state.portal_service.bitrix_client_factory = lambda portal: fake_client
+        self.client.post(
+            "/api/ui/groups/portal-context",
+            json={
+                "AUTH_ID": "token-1",
+                "REFRESH_ID": "refresh-1",
+                "DOMAIN": "portal.example.bitrix24.ru",
+                "PROTOCOL": "1",
+                "member_id": "portal-789",
+            },
+        )
+        self.client.post(
+            "/api/ui/groups/config?member_id=portal-789",
+            json={
+                "name": "Основная группа",
+                "distribution_type": "round_robin_load_time",
+                "event_type": "deal_created",
+                "distribution_stage_id": "NEW",
+                "load_stage_ids": ["NEW"],
+                "responsible_field_id": "ASSIGNED_BY_ID",
+                "wait_seconds": 120,
+                "retry_interval_seconds": 30,
+                "is_active": True,
+                "members": [{"user_id": "10", "limit": 3}],
+            },
+        )
+
+        response = self.client.post(
+            "/api/bitrix/events",
+            data={
+                "event": "ONCRMDEALADD",
+                "data[FIELDS][ID]": "700",
+                "auth[member_id]": "portal-789",
+                "auth[domain]": "portal.example.bitrix24.ru",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("assigned", response.json()["result"]["status"])
+        self.assertEqual("10", response.json()["result"]["assigned_user_id"])
 
     def test_config_endpoint_works_with_legacy_distribution_groups_table_present(self) -> None:
         temp_dir = tempfile.TemporaryDirectory()

@@ -8,6 +8,10 @@ from .bitrix_api import BitrixApiError, BitrixClient
 from .contracts import PortalAuth
 from .database import Database, to_json
 
+DEAL_ENTITY_TYPE_ID = 2
+BITRIX_EVENT_DEAL_CREATED = "ONCRMDEALADD"
+DISTRIBUTION_EVENT_DEAL_CREATED = "deal_created"
+
 
 class BitrixListClient(Protocol):
     def call(self, method: str, params: dict[str, object] | None = None) -> dict[str, Any]:
@@ -161,6 +165,133 @@ class PortalService:
             raise ValueError("Distribution group was not saved")
         return saved
 
+    def ensure_deal_created_event_binding(self, portal_member_id: str, handler_url: str) -> dict[str, object]:
+        normalized_handler_url = handler_url.strip()
+        if not normalized_handler_url:
+            raise ValueError("Event handler URL is required")
+
+        client = self._get_bitrix_client(portal_member_id)
+        existing = self._normalize_event_handlers(client.call("event.get"))
+        for binding in existing:
+            if binding["event"] != BITRIX_EVENT_DEAL_CREATED:
+                continue
+            if _normalize_handler_url(str(binding["handler"])) != _normalize_handler_url(normalized_handler_url):
+                continue
+            return {
+                "event": BITRIX_EVENT_DEAL_CREATED,
+                "handler": normalized_handler_url,
+                "already_bound": True,
+                "bound": False,
+            }
+
+        client.call(
+            "event.bind",
+            {
+                "event": BITRIX_EVENT_DEAL_CREATED,
+                "handler": normalized_handler_url,
+            },
+        )
+        return {
+            "event": BITRIX_EVENT_DEAL_CREATED,
+            "handler": normalized_handler_url,
+            "already_bound": False,
+            "bound": True,
+        }
+
+    def handle_bitrix_event(self, payload: dict[str, Any]) -> dict[str, object]:
+        event_name = str(payload.get("event") or "").strip().upper()
+        if event_name != BITRIX_EVENT_DEAL_CREATED:
+            return {
+                "status": "ignored",
+                "reason": "unsupported_event",
+                "event": event_name or None,
+            }
+
+        if self._can_install_from_payload(payload):
+            self.install_portal(payload)
+
+        portal_member_id = self._extract_event_member_id(payload)
+        deal_id = self._extract_event_deal_id(payload)
+        return self._handle_deal_created_event(portal_member_id, deal_id)
+
+    def _handle_deal_created_event(self, portal_member_id: str, deal_id: str) -> dict[str, object]:
+        self.get_portal(portal_member_id)
+
+        existing_runtime = self._get_deal_runtime(portal_member_id, deal_id, DISTRIBUTION_EVENT_DEAL_CREATED)
+        if existing_runtime is not None:
+            result = dict(existing_runtime)
+            result["reason"] = "duplicate_event"
+            return result
+
+        config = self.get_distribution_group(portal_member_id)
+        if config is None:
+            return self._record_and_return_deal_runtime(
+                portal_member_id,
+                deal_id,
+                status="ignored",
+                note="Distribution group is not configured",
+            )
+        if not bool(config.get("is_active")):
+            return self._record_and_return_deal_runtime(
+                portal_member_id,
+                deal_id,
+                status="ignored",
+                note="Distribution group is inactive",
+            )
+        if str(config.get("event_type") or "") != DISTRIBUTION_EVENT_DEAL_CREATED:
+            return self._record_and_return_deal_runtime(
+                portal_member_id,
+                deal_id,
+                status="ignored",
+                note="Distribution group does not handle deal creation events",
+            )
+
+        members = config.get("members")
+        if not isinstance(members, list) or not members:
+            return self._record_and_return_deal_runtime(
+                portal_member_id,
+                deal_id,
+                status="ignored",
+                note="Distribution group has no members",
+            )
+
+        client = self._get_bitrix_client(portal_member_id)
+        deal = self._get_deal_item(client, deal_id)
+        current_stage_id = self._extract_deal_stage_id(deal)
+        if current_stage_id != str(config["distribution_stage_id"]):
+            return self._record_and_return_deal_runtime(
+                portal_member_id,
+                deal_id,
+                status="ignored",
+                note=f"Deal stage {current_stage_id or '<empty>'} does not match distribution stage",
+            )
+
+        selection = self._select_distribution_candidate(portal_member_id, client, config)
+        if selection["selected_member"] is None:
+            return self._record_and_return_deal_runtime(
+                portal_member_id,
+                deal_id,
+                status="waiting",
+                note="All distribution members reached their limits",
+                extra={"loads": selection["loads"]},
+            )
+
+        selected_member = selection["selected_member"]
+        selected_user_id = str(selected_member["user_id"])
+        responsible_field_id = str(config["responsible_field_id"])
+
+        self._assign_deal_to_member(client, deal_id, responsible_field_id, selected_user_id)
+        self._touch_member_runtime(portal_member_id, selected_user_id, deal_id)
+        return self._record_and_return_deal_runtime(
+            portal_member_id,
+            deal_id,
+            status="assigned",
+            assigned_user_id=selected_user_id,
+            assigned_field_id=responsible_field_id,
+            note="Deal assigned after load calculation",
+            extra={"loads": selection["loads"]},
+        )
+
     def _extract_auth_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         if "member_id" in payload and "domain" in payload:
             return payload
@@ -229,6 +360,265 @@ class PortalService:
     def _get_bitrix_client(self, portal_member_id: str) -> BitrixListClient:
         portal = self.get_portal(portal_member_id)
         return self.bitrix_client_factory(portal)
+
+    def _can_install_from_payload(self, payload: dict[str, Any]) -> bool:
+        auth = payload.get("auth")
+        if not isinstance(auth, dict):
+            return False
+        return bool(str(auth.get("member_id") or "").strip() and str(auth.get("domain") or "").strip())
+
+    def _extract_event_member_id(self, payload: dict[str, Any]) -> str:
+        auth = payload.get("auth")
+        if isinstance(auth, dict):
+            member_id = str(auth.get("member_id") or "").strip()
+            if member_id:
+                return member_id
+
+        member_id = str(payload.get("member_id") or payload.get("MEMBER_ID") or "").strip()
+        if member_id:
+            return member_id
+        raise ValueError("Bitrix event payload is missing member_id")
+
+    def _extract_event_deal_id(self, payload: dict[str, Any]) -> str:
+        data = payload.get("data")
+        if isinstance(data, dict):
+            fields = data.get("FIELDS")
+            if isinstance(fields, dict):
+                deal_id = str(fields.get("ID") or "").strip()
+                if deal_id:
+                    return deal_id
+        raise ValueError("Bitrix deal event payload is missing deal ID")
+
+    def _get_deal_item(self, client: BitrixListClient, deal_id: str) -> dict[str, Any]:
+        payload = client.call(
+            "crm.item.get",
+            {
+                "entityTypeId": DEAL_ENTITY_TYPE_ID,
+                "id": _maybe_int(deal_id),
+                "useOriginalUfNames": "Y",
+            },
+        )
+        result = payload.get("result")
+        if not isinstance(result, dict):
+            raise BitrixApiError("Bitrix deal payload has an unexpected format")
+        item = result.get("item")
+        if not isinstance(item, dict):
+            raise BitrixApiError("Bitrix deal payload is missing item data")
+        return item
+
+    def _extract_deal_stage_id(self, deal: dict[str, Any]) -> str:
+        return str(deal.get("stageId") or deal.get("STAGE_ID") or "").strip()
+
+    def _select_distribution_candidate(
+        self,
+        portal_member_id: str,
+        client: BitrixListClient,
+        config: dict[str, object],
+    ) -> dict[str, object]:
+        members = config.get("members")
+        if not isinstance(members, list):
+            raise ValueError("Stored distribution members payload must be a list")
+
+        responsible_field_id = str(config["responsible_field_id"])
+        load_stage_ids = config.get("load_stage_ids")
+        if not isinstance(load_stage_ids, list):
+            raise ValueError("Stored distribution load stages payload must be a list")
+
+        last_assigned_map = self._get_member_last_assigned_map(portal_member_id)
+        loads: list[dict[str, object]] = []
+        available_members: list[dict[str, object]] = []
+        for raw_member in members:
+            if not isinstance(raw_member, dict):
+                continue
+            user_id = str(raw_member.get("user_id") or "").strip()
+            if not user_id:
+                continue
+            limit_value = _coerce_int(raw_member.get("limit"), field_name=f"Member limit for {user_id}")
+            sort_order = _coerce_int(raw_member.get("sort_order"), field_name=f"Member sort order for {user_id}")
+            current_load = self._count_member_load(client, responsible_field_id, load_stage_ids, user_id)
+            last_assigned_at = last_assigned_map.get(user_id)
+            descriptor = {
+                "user_id": user_id,
+                "limit": limit_value,
+                "sort_order": sort_order,
+                "current_load": current_load,
+                "last_assigned_at": last_assigned_at,
+            }
+            loads.append(descriptor)
+            if current_load < limit_value:
+                available_members.append(descriptor)
+
+        available_members.sort(
+            key=lambda member: (
+                int(member["current_load"]),
+                str(member.get("last_assigned_at") or ""),
+                int(member["sort_order"]),
+            )
+        )
+        selected_member = available_members[0] if available_members else None
+        return {"selected_member": selected_member, "loads": loads}
+
+    def _count_member_load(
+        self,
+        client: BitrixListClient,
+        responsible_field_id: str,
+        load_stage_ids: list[object],
+        user_id: str,
+    ) -> int:
+        filter_field = _resolve_responsible_field_api_name(responsible_field_id)
+        items = client.call_list(
+            "crm.item.list",
+            {
+                "entityTypeId": DEAL_ENTITY_TYPE_ID,
+                "select": ["id"],
+                "filter": {
+                    "@stageId": [str(stage_id) for stage_id in load_stage_ids],
+                    f"@{filter_field}": [_maybe_int(user_id)],
+                },
+                "useOriginalUfNames": "Y",
+            },
+        )
+        return len(items)
+
+    def _assign_deal_to_member(
+        self,
+        client: BitrixListClient,
+        deal_id: str,
+        responsible_field_id: str,
+        user_id: str,
+    ) -> None:
+        field_name = _resolve_responsible_field_api_name(responsible_field_id)
+        client.call(
+            "crm.item.update",
+            {
+                "entityTypeId": DEAL_ENTITY_TYPE_ID,
+                "id": _maybe_int(deal_id),
+                "fields": {field_name: _maybe_int(user_id)},
+                "useOriginalUfNames": "Y",
+            },
+        )
+
+    def _get_member_last_assigned_map(self, portal_member_id: str) -> dict[str, str | None]:
+        rows = self.database.fetch_all(
+            """
+            SELECT user_id, last_assigned_at
+            FROM distribution_member_runtime
+            WHERE portal_member_id = ?
+            """,
+            (portal_member_id,),
+        )
+        return {str(row["user_id"]): _as_optional_str(row["last_assigned_at"]) for row in rows}
+
+    def _touch_member_runtime(self, portal_member_id: str, user_id: str, deal_id: str) -> None:
+        now = _iso_now()
+        with self.database.connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO distribution_member_runtime (
+                    portal_member_id, user_id, last_assigned_deal_id, last_assigned_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(portal_member_id, user_id) DO UPDATE SET
+                    last_assigned_deal_id = excluded.last_assigned_deal_id,
+                    last_assigned_at = excluded.last_assigned_at,
+                    updated_at = excluded.updated_at
+                """,
+                (portal_member_id, user_id, deal_id, now, now),
+            )
+
+    def _get_deal_runtime(
+        self,
+        portal_member_id: str,
+        deal_id: str,
+        event_type: str,
+    ) -> dict[str, object] | None:
+        row = self.database.fetch_one(
+            """
+            SELECT *
+            FROM distribution_deal_runtime
+            WHERE portal_member_id = ? AND deal_id = ? AND event_type = ?
+            """,
+            (portal_member_id, deal_id, event_type),
+        )
+        if row is None:
+            return None
+        return {
+            "portal_member_id": str(row["portal_member_id"]),
+            "deal_id": str(row["deal_id"]),
+            "event_type": str(row["event_type"]),
+            "status": str(row["status"]),
+            "assigned_user_id": _as_optional_str(row["assigned_user_id"]),
+            "assigned_field_id": _as_optional_str(row["assigned_field_id"]),
+            "note": _as_optional_str(row["note"]),
+            "created_at": str(row["created_at"]),
+            "updated_at": str(row["updated_at"]),
+        }
+
+    def _record_and_return_deal_runtime(
+        self,
+        portal_member_id: str,
+        deal_id: str,
+        *,
+        status: str,
+        note: str,
+        assigned_user_id: str | None = None,
+        assigned_field_id: str | None = None,
+        extra: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        now = _iso_now()
+        existing = self._get_deal_runtime(portal_member_id, deal_id, DISTRIBUTION_EVENT_DEAL_CREATED)
+        created_at = str(existing["created_at"]) if existing is not None else now
+
+        with self.database.connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO distribution_deal_runtime (
+                    portal_member_id, deal_id, event_type, status, assigned_user_id,
+                    assigned_field_id, note, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(portal_member_id, deal_id, event_type) DO UPDATE SET
+                    status = excluded.status,
+                    assigned_user_id = excluded.assigned_user_id,
+                    assigned_field_id = excluded.assigned_field_id,
+                    note = excluded.note,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    portal_member_id,
+                    deal_id,
+                    DISTRIBUTION_EVENT_DEAL_CREATED,
+                    status,
+                    assigned_user_id,
+                    assigned_field_id,
+                    note,
+                    created_at,
+                    now,
+                ),
+            )
+
+        result = self._get_deal_runtime(portal_member_id, deal_id, DISTRIBUTION_EVENT_DEAL_CREATED)
+        if result is None:
+            raise ValueError("Distribution deal runtime was not saved")
+        if extra:
+            result.update(extra)
+        return result
+
+    def _normalize_event_handlers(self, payload: dict[str, Any]) -> list[dict[str, object]]:
+        result = payload.get("result")
+        if not isinstance(result, list):
+            raise BitrixApiError("Bitrix event handler payload has an unexpected format")
+
+        handlers: list[dict[str, object]] = []
+        for item in result:
+            if not isinstance(item, dict):
+                continue
+            event_name = str(item.get("event") or "").strip().upper()
+            handler = str(item.get("handler") or "").strip()
+            if not event_name or not handler:
+                continue
+            handlers.append({"event": event_name, "handler": handler})
+        return handlers
 
     def _normalize_distribution_group_payload(self, payload: dict[str, Any]) -> dict[str, object]:
         name = str(payload.get("name") or "").strip()
@@ -431,3 +821,21 @@ def _parse_json_list(raw_value: Any, field_name: str) -> list[dict[str, object]]
     if not isinstance(parsed, list):
         raise ValueError(f"Stored {field_name} payload must be a list")
     return parsed
+
+
+def _resolve_responsible_field_api_name(field_id: str) -> str:
+    normalized = field_id.strip().upper()
+    if normalized == "ASSIGNED_BY_ID":
+        return "assignedById"
+    return field_id.strip()
+
+
+def _maybe_int(value: Any) -> int | str:
+    text = str(value or "").strip()
+    if text.isdigit():
+        return int(text)
+    return text
+
+
+def _normalize_handler_url(value: str) -> str:
+    return value.strip().rstrip("/")

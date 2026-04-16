@@ -33,4 +33,28 @@ CREATE TABLE IF NOT EXISTS distribution_group_configs (
     updated_at TEXT NOT NULL,
     FOREIGN KEY (portal_member_id) REFERENCES portals(member_id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS distribution_member_runtime (
+    portal_member_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    last_assigned_deal_id TEXT,
+    last_assigned_at TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (portal_member_id, user_id),
+    FOREIGN KEY (portal_member_id) REFERENCES portals(member_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS distribution_deal_runtime (
+    portal_member_id TEXT NOT NULL,
+    deal_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    assigned_user_id TEXT,
+    assigned_field_id TEXT,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (portal_member_id, deal_id, event_type),
+    FOREIGN KEY (portal_member_id) REFERENCES portals(member_id) ON DELETE CASCADE
+);
 """
