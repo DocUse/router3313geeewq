@@ -81,6 +81,8 @@ class AppUiTests(unittest.TestCase):
 
         self.assertEqual(200, response.status_code)
         self.assertIn("Распределение сделок", response.text)
+        self.assertIn('id="statsPanel"', response.text)
+        self.assertIn('id="statsJournalList"', response.text)
         self.assertIn('id="distributionGroupsPanel"', response.text)
         self.assertIn('id="createDistributionGroupButton"', response.text)
         self.assertIn('id="distributionForm"', response.text)
@@ -171,6 +173,80 @@ class AppUiTests(unittest.TestCase):
             ],
             get_response.json()["config"]["members"],
         )
+
+    def test_stats_endpoint_returns_distribution_runtime_journal(self) -> None:
+        self.client.post(
+            "/api/ui/groups/portal-context",
+            json={
+                "AUTH_ID": "token-1",
+                "REFRESH_ID": "refresh-1",
+                "DOMAIN": "portal.example.bitrix24.ru",
+                "PROTOCOL": "1",
+                "member_id": "portal-789",
+            },
+        )
+        self.client.app.state.portal_service.save_distribution_group(
+            "portal-789",
+            {
+                "name": "Основная группа",
+                "distribution_type": "round_robin_load_time",
+                "event_type": "deal_created",
+                "distribution_stage_id": "NEW",
+                "load_stage_ids": ["NEW"],
+                "responsible_field_id": "ASSIGNED_BY_ID",
+                "wait_seconds": 120,
+                "retry_interval_seconds": 30,
+                "is_active": True,
+                "members": [{"user_id": "10", "limit": 3}],
+            },
+        )
+        database = self.client.app.state.database
+        database.execute(
+            """
+            INSERT INTO distribution_deal_runtime (
+                portal_member_id, deal_id, event_type, status, assigned_user_id,
+                assigned_field_id, note, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "portal-789",
+                "700",
+                "deal_created",
+                "assigned",
+                "10",
+                "ASSIGNED_BY_ID",
+                "Deal assigned after load calculation",
+                "2026-04-16T09:00:00+00:00",
+                "2026-04-16T09:01:00+00:00",
+            ),
+        )
+        database.execute(
+            """
+            INSERT INTO distribution_member_runtime (
+                portal_member_id, user_id, last_assigned_deal_id, last_assigned_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "portal-789",
+                "10",
+                "700",
+                "2026-04-16T09:01:00+00:00",
+                "2026-04-16T09:01:00+00:00",
+            ),
+        )
+
+        response = self.client.get("/api/ui/stats?member_id=portal-789")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual(1, payload["summary"]["journal_count"])
+        self.assertEqual(1, payload["summary"]["assigned_count"])
+        self.assertEqual("700", payload["journal"][0]["deal_id"])
+        self.assertEqual("10", payload["journal"][0]["assigned_user_id"])
+        self.assertEqual("10", payload["journal"][0]["assigned_user_name"])
+        self.assertEqual("700", payload["members"][0]["last_assigned_deal_id"])
 
     def test_distribution_group_config_endpoint_binds_event_for_public_https_request(self) -> None:
         fake_client = FakeBitrixClient(

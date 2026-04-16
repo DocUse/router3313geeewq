@@ -712,6 +712,38 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
       margin: 0;
     }
 
+    .stats-view {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-height: 100%;
+    }
+
+    .stats-toolbar {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .stats-grid--full {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .stats-empty {
+      padding: 16px;
+      border-radius: 14px;
+      background: #f7faff;
+      border: 1px dashed rgba(46, 123, 244, 0.16);
+      color: #7081a8;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
     .section-panel[hidden] {
       display: none;
     }
@@ -759,6 +791,10 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
       .distribution-row-label,
       .distribution-row-control {
         padding: 0;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -831,6 +867,53 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
           <p class="canvas-subtitle" id="sectionDescription">
             Собираем общую информацию. Пока собрали только то, что её нет.
           </p>
+        </div>
+
+        <div class="section-panel" id="statsPanel" hidden>
+          <div class="stats-view">
+            <div class="distribution-reference-head">
+              <h2 class="distribution-reference-title">Статистика</h2>
+              <p class="distribution-reference-description">
+                Здесь отображается технический журнал распределения: какие сделки обрабатывались, какой статус получили и кто назначался последним.
+              </p>
+            </div>
+
+            <div class="stats-toolbar">
+              <button class="secondary-action" id="refreshStatsButton" type="button">Обновить журнал</button>
+            </div>
+
+            <div class="reference-status" id="statsStatus" hidden>
+              Откройте раздел, чтобы загрузить журнал.
+            </div>
+
+            <div class="stats-grid">
+              <section class="reference-card" aria-labelledby="statsSummaryTitle">
+                <div class="reference-card-head">
+                  <h3 class="reference-card-title" id="statsSummaryTitle">Сводка</h3>
+                  <p class="reference-card-description">Короткое состояние рантайма по последним записям.</p>
+                </div>
+                <div class="reference-list" id="statsSummaryList"></div>
+              </section>
+
+              <section class="reference-card" aria-labelledby="statsMembersTitle">
+                <div class="reference-card-head">
+                  <h3 class="reference-card-title" id="statsMembersTitle">Участники</h3>
+                  <p class="reference-card-description">Последнее назначение по каждому участнику из runtime-таблицы.</p>
+                </div>
+                <div class="reference-list" id="statsMembersList"></div>
+              </section>
+            </div>
+
+            <div class="stats-grid stats-grid--full">
+              <section class="reference-card" aria-labelledby="statsJournalTitle">
+                <div class="reference-card-head">
+                  <h3 class="reference-card-title" id="statsJournalTitle">Журнал сделок</h3>
+                  <p class="reference-card-description">Последние записи из runtime-журнала распределения по сделкам.</p>
+                </div>
+                <div class="reference-list" id="statsJournalList"></div>
+              </section>
+            </div>
+          </div>
         </div>
 
         <div class="section-panel" id="distributionPanel" hidden>
@@ -976,7 +1059,7 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
       stats: {
         badge: "Раздел",
         title: "Статистика",
-        description: "График посещений: Рисуем прямую линию по нулям карандашом на мониторе.",
+        description: "Технический журнал событий и назначений по сделкам.",
       },
       settings: {
         badge: "Раздел",
@@ -986,6 +1069,7 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
     };
 
     const defaultPanel = document.getElementById("defaultPanel");
+    const statsPanel = document.getElementById("statsPanel");
     const distributionPanel = document.getElementById("distributionPanel");
     const sectionBadge = document.getElementById("sectionBadge");
     const sectionTitle = document.getElementById("sectionTitle");
@@ -1010,6 +1094,11 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
     const participantsList = document.getElementById("participantsList");
     const loadStagesList = document.getElementById("loadStagesList");
     const saveDistributionButton = document.getElementById("saveDistributionButton");
+    const statsStatus = document.getElementById("statsStatus");
+    const statsSummaryList = document.getElementById("statsSummaryList");
+    const statsMembersList = document.getElementById("statsMembersList");
+    const statsJournalList = document.getElementById("statsJournalList");
+    const refreshStatsButton = document.getElementById("refreshStatsButton");
     const initialDistributionMemberId = __INITIAL_MEMBER_ID__;
     const distributionState = {
       isLoaded: false,
@@ -1019,6 +1108,11 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
       referenceData: null,
       config: null,
       openFormRequested: false,
+    };
+    const statsState = {
+      isLoaded: false,
+      isLoading: false,
+      data: null,
     };
 
     function setDistributionStatus(message, tone) {
@@ -1039,6 +1133,121 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
     function showDistributionForm() {
       distributionGroupsPanel.hidden = true;
       distributionStatus.hidden = false;
+    }
+
+    function setStatsStatus(message, tone) {
+      statsStatus.hidden = false;
+      statsStatus.textContent = message;
+      statsStatus.classList.remove("is-error", "is-success");
+      if (tone) {
+        statsStatus.classList.add(tone);
+      }
+    }
+
+    function createStatsItem(title, metaLines, pills) {
+      const item = document.createElement("div");
+      item.className = "reference-item";
+
+      const itemTitle = document.createElement("div");
+      itemTitle.className = "reference-item-title";
+      itemTitle.textContent = title;
+      item.appendChild(itemTitle);
+
+      (metaLines || []).filter(Boolean).forEach((line) => {
+        const meta = document.createElement("div");
+        meta.className = "reference-item-meta";
+        meta.textContent = line;
+        item.appendChild(meta);
+      });
+
+      if (Array.isArray(pills) && pills.length) {
+        const pillRow = document.createElement("div");
+        pillRow.className = "reference-pill-row";
+        pills.forEach((pill) => {
+          const badge = document.createElement("span");
+          badge.className = `reference-pill${pill.muted ? " is-muted" : ""}`;
+          badge.textContent = pill.label;
+          pillRow.appendChild(badge);
+        });
+        item.appendChild(pillRow);
+      }
+
+      return item;
+    }
+
+    function renderStatsEmpty(container, message) {
+      container.innerHTML = "";
+      const empty = document.createElement("div");
+      empty.className = "stats-empty";
+      empty.textContent = message;
+      container.appendChild(empty);
+    }
+
+    function formatStatsDate(value) {
+      if (!value) {
+        return "нет данных";
+      }
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        return value;
+      }
+      return parsed.toLocaleString("ru-RU");
+    }
+
+    function renderStatsData(payload) {
+      const summary = payload && payload.summary ? payload.summary : {};
+      const journal = Array.isArray(payload && payload.journal) ? payload.journal : [];
+      const members = Array.isArray(payload && payload.members) ? payload.members : [];
+
+      statsSummaryList.innerHTML = "";
+      statsSummaryList.appendChild(createStatsItem("Записей в журнале", [`Всего: ${summary.journal_count || 0}`], [
+        { label: `Назначено: ${summary.assigned_count || 0}` },
+        { label: `Ожидание: ${summary.waiting_count || 0}`, muted: true },
+        { label: `Игнорировано: ${summary.ignored_count || 0}`, muted: true },
+      ]));
+      statsSummaryList.appendChild(createStatsItem("Runtime участников", [`Записей: ${summary.member_runtime_count || 0}`], []));
+
+      if (!members.length) {
+        renderStatsEmpty(statsMembersList, "Пока нет runtime-записей по участникам.");
+      } else {
+        statsMembersList.innerHTML = "";
+        members.forEach((member) => {
+          statsMembersList.appendChild(createStatsItem(
+            member.user_name || `Пользователь ${member.user_id}`,
+            [
+              `ID: ${member.user_id}`,
+              `Последняя сделка: ${member.last_assigned_deal_id || "не было"}`,
+              `Последнее назначение: ${formatStatsDate(member.last_assigned_at)}`,
+              `Обновлено: ${formatStatsDate(member.updated_at)}`,
+            ],
+            [],
+          ));
+        });
+      }
+
+      if (!journal.length) {
+        renderStatsEmpty(statsJournalList, "Журнал пуст. Как только backend запишет обработку сделок, записи появятся здесь.");
+      } else {
+        statsJournalList.innerHTML = "";
+        journal.forEach((item) => {
+          const assignedTo = item.assigned_user_id
+            ? `${item.assigned_user_name || item.assigned_user_id} (${item.assigned_user_id})`
+            : "не назначено";
+          statsJournalList.appendChild(createStatsItem(
+            `Сделка #${item.deal_id}`,
+            [
+              `Статус: ${item.status}`,
+              `Назначено: ${assignedTo}`,
+              `Поле: ${item.assigned_field_id || "не заполнялось"}`,
+              `Комментарий: ${item.note || "нет"}`,
+              `Обновлено: ${formatStatsDate(item.updated_at)}`,
+            ],
+            [
+              { label: item.event_type || "event" },
+            ],
+          ));
+        });
+      }
     }
 
     async function fetchJson(url, options) {
@@ -1387,10 +1596,48 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
         );
 
         distributionState.config = normalizeLoadedDistributionConfig(response.config, distributionState.referenceData);
+        statsState.isLoaded = false;
         renderDistributionConfigForm();
         setDistributionStatus("Группа распределения сохранена. После перезагрузки конфигурация будет поднята из базы.", "is-success");
       } catch (error) {
         setDistributionStatus(error.message || "Не удалось сохранить конфигурацию группы.", "is-error");
+      }
+    }
+
+    async function loadStatsData(forceReload) {
+      if (statsState.isLoading) {
+        return;
+      }
+      if (statsState.isLoaded && !forceReload) {
+        renderStatsData(statsState.data || {});
+        return;
+      }
+
+      const distributionMemberId = await resolveDistributionMemberId();
+      if (!distributionMemberId) {
+        setStatsStatus("Не удалось определить member_id портала для загрузки статистики.", "is-error");
+        renderStatsEmpty(statsSummaryList, "Нет portal context.");
+        renderStatsEmpty(statsMembersList, "Нет portal context.");
+        renderStatsEmpty(statsJournalList, "Нет portal context.");
+        return;
+      }
+
+      statsState.isLoading = true;
+      setStatsStatus("Загружаем журнал распределения...");
+      try {
+        await syncPortalContextFromBitrix();
+        const payload = await fetchJson(`/api/ui/stats?member_id=${encodeURIComponent(distributionMemberId)}`);
+        statsState.data = payload;
+        statsState.isLoaded = true;
+        renderStatsData(payload);
+        setStatsStatus("Журнал и runtime-данные обновлены.", "is-success");
+      } catch (error) {
+        setStatsStatus(error.message || "Не удалось загрузить статистику.", "is-error");
+        renderStatsEmpty(statsSummaryList, "Статистика пока недоступна.");
+        renderStatsEmpty(statsMembersList, "Статистика пока недоступна.");
+        renderStatsEmpty(statsJournalList, "Статистика пока недоступна.");
+      } finally {
+        statsState.isLoading = false;
       }
     }
 
@@ -1461,20 +1708,24 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
     function setActiveView(view) {
       const content = sectionContent[view] || sectionContent.overview;
       const isDistribution = view === "distribution";
+      const isStats = view === "stats";
 
-      defaultPanel.hidden = isDistribution;
+      defaultPanel.hidden = isDistribution || isStats;
+      statsPanel.hidden = !isStats;
       distributionPanel.hidden = !isDistribution;
       mainCard.classList.remove("is-centered");
 
-      if (!isDistribution) {
+      if (!isDistribution && !isStats) {
         distributionState.openFormRequested = false;
         sectionBadge.textContent = content.badge;
         sectionTitle.textContent = content.title;
         sectionDescription.textContent = content.description;
-      } else {
+      } else if (isDistribution) {
         distributionState.openFormRequested = false;
         showDistributionLanding();
         loadDistributionReferenceData();
+      } else {
+        loadStatsData(false);
       }
 
       menuButtons.forEach((button) => {
@@ -1485,6 +1736,7 @@ def render_blank_page(*, initial_member_id: str | None = None) -> str:
     applyBulkLimitButton.addEventListener("click", applyBulkLimitFromForm);
     createDistributionGroupButton.addEventListener("click", handleCreateDistributionGroupClick);
     saveDistributionButton.addEventListener("click", saveDistributionConfig);
+    refreshStatsButton.addEventListener("click", () => loadStatsData(true));
 
     menuButtons.forEach((button) => {
       button.addEventListener("click", () => setActiveView(button.dataset.view));

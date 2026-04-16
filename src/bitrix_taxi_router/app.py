@@ -72,6 +72,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         member_id = _require_member_id(request)
         return {"config": _load_reference_data(service.get_distribution_group, member_id)}
 
+    @app.get("/api/ui/stats")
+    async def stats_get(request: Request) -> dict[str, object]:
+        member_id = _require_member_id(request)
+        return _load_reference_data(service.get_distribution_statistics, member_id)
+
     @app.post("/api/ui/groups/config")
     async def groups_config_post(request: Request) -> dict[str, object]:
         member_id = _require_member_id(request)
