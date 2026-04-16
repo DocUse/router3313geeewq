@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS portals (
     updated_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS distribution_groups (
+CREATE TABLE IF NOT EXISTS distribution_group_configs (
     portal_member_id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     distribution_type TEXT NOT NULL,

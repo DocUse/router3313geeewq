@@ -90,7 +90,7 @@ class PortalService:
     def get_distribution_group(self, portal_member_id: str) -> dict[str, object] | None:
         self.get_portal(portal_member_id)
         row = self.database.fetch_one(
-            "SELECT * FROM distribution_groups WHERE portal_member_id = ?",
+            "SELECT * FROM distribution_group_configs WHERE portal_member_id = ?",
             (portal_member_id,),
         )
         if row is None:
@@ -120,7 +120,7 @@ class PortalService:
         with self.database.connection() as connection:
             connection.execute(
                 """
-                INSERT INTO distribution_groups (
+                INSERT INTO distribution_group_configs (
                     portal_member_id, name, distribution_type, event_type, distribution_stage_id,
                     responsible_field_id, wait_seconds, retry_interval_seconds, is_active,
                     members_json, load_stage_ids_json, created_at, updated_at

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -142,6 +143,83 @@ class AppUiTests(unittest.TestCase):
             ],
             get_response.json()["config"]["members"],
         )
+
+    def test_config_endpoint_works_with_legacy_distribution_groups_table_present(self) -> None:
+        temp_dir = tempfile.TemporaryDirectory()
+        try:
+            db_path = Path(temp_dir.name) / "legacy.sqlite3"
+            connection = sqlite3.connect(db_path)
+            connection.execute(
+                """
+                CREATE TABLE portals (
+                    member_id TEXT PRIMARY KEY,
+                    domain TEXT NOT NULL,
+                    application_token TEXT,
+                    access_token TEXT,
+                    refresh_token TEXT,
+                    client_endpoint TEXT,
+                    server_endpoint TEXT,
+                    status TEXT,
+                    installed_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE distribution_groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    portal_member_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    entity_type TEXT NOT NULL,
+                    initial_stage_id TEXT NOT NULL,
+                    timeout_seconds INTEGER NOT NULL,
+                    priority INTEGER NOT NULL,
+                    event_on_add INTEGER NOT NULL,
+                    event_on_update INTEGER NOT NULL,
+                    is_active INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO portals (
+                    member_id, domain, application_token, access_token, refresh_token,
+                    client_endpoint, server_endpoint, status, installed_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "portal-legacy",
+                    "portal.example.bitrix24.ru",
+                    None,
+                    "token-1",
+                    "refresh-1",
+                    "https://portal.example.bitrix24.ru/rest/",
+                    "https://oauth.bitrix.info/rest/",
+                    "T",
+                    "now",
+                    "now",
+                ),
+            )
+            connection.commit()
+            connection.close()
+
+            settings = Settings(
+                app_env="test",
+                app_host="127.0.0.1",
+                app_port=8000,
+                db_path=db_path,
+            )
+            client = TestClient(create_app(settings))
+
+            response = client.get("/api/ui/groups/config?member_id=portal-legacy")
+            self.assertEqual(200, response.status_code)
+            self.assertEqual({"config": None}, response.json())
+        finally:
+            temp_dir.cleanup()
 
 
 if __name__ == "__main__":
