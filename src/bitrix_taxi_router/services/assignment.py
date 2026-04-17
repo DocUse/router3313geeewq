@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from typing import Protocol
 
 from .common import coerce_int
@@ -78,15 +79,15 @@ def count_member_load(
         "crm.item.list",
         {
             "entityTypeId": DEAL_ENTITY_TYPE_ID,
-            "select": ["id"],
+            "select": ["id", "stageId"],
             "filter": {
-                "@stageId": [str(stage_id) for stage_id in load_stage_ids],
                 f"@{filter_field}": [maybe_int(user_id)],
             },
             "useOriginalUfNames": "Y",
         },
     )
-    return len(items)
+    configured_stage_ids = [str(stage_id) for stage_id in load_stage_ids]
+    return sum(1 for item in items if item_matches_load_stage(item, configured_stage_ids))
 
 
 def assign_deal_to_member(
@@ -110,3 +111,12 @@ def resolve_responsible_field_api_name(field_id: str) -> str:
     if normalized == "ASSIGNED_BY_ID":
         return "assignedById"
     return field_id.strip()
+
+
+def item_matches_load_stage(item: dict[str, object], configured_stage_ids: list[str]) -> bool:
+    stage_id = str(item.get("stageId") or item.get("STAGE_ID") or "").strip()
+    if not stage_id:
+        return False
+
+    stage_suffix = stage_id.split(":", 1)[-1]
+    return any(configured_stage_id == stage_id or configured_stage_id == stage_suffix for configured_stage_id in configured_stage_ids)

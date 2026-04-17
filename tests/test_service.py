@@ -14,6 +14,7 @@ from bitrix_taxi_router.bitrix_api import BitrixApiError
 from bitrix_taxi_router.bitrix_api import BitrixClient
 from bitrix_taxi_router.database import Database
 from bitrix_taxi_router.service import PortalService
+from bitrix_taxi_router.services.assignment import count_member_load
 
 
 class FakeBitrixClient:
@@ -384,9 +385,9 @@ class PortalServiceTests(unittest.TestCase):
             {
                 "crm.item.get": {"result": {"item": {"id": 501, "stageId": "NEW"}}},
                 "crm.item.list": lambda params: (
-                    [{"id": 1}, {"id": 2}]
+                    [{"id": 1, "stageId": "NEW"}, {"id": 2, "stageId": "IN_PROGRESS"}]
                     if params and params.get("filter", {}).get("@assignedById") == [10]
-                    else [{"id": 3}, {"id": 4}]
+                    else [{"id": 3, "stageId": "NEW"}, {"id": 4, "stageId": "IN_PROGRESS"}]
                 ),
                 "crm.item.update": {"result": {"item": {"id": 501}}},
             }
@@ -468,7 +469,7 @@ class PortalServiceTests(unittest.TestCase):
         fake_client = FakeBitrixClient(
             {
                 "crm.item.get": {"result": {"item": {"id": 700, "stageId": "NEW"}}},
-                "crm.item.list": [{"id": 1}, {"id": 2}],
+                "crm.item.list": [{"id": 1, "stageId": "NEW"}, {"id": 2, "stageId": "NEW"}],
                 "crm.item.update": {"result": {"item": {"id": 700}}},
             }
         )
@@ -515,6 +516,21 @@ class PortalServiceTests(unittest.TestCase):
         self.assertEqual("waiting", result["status"])
         self.assertIsNone(result["assigned_user_id"])
         self.assertEqual([], [call for call in fake_client.calls if call[1] == "crm.item.update"])
+
+    def test_count_member_load_accepts_stage_ids_with_funnel_prefix(self) -> None:
+        fake_client = FakeBitrixClient(
+            {
+                "crm.item.list": [
+                    {"id": 1, "stageId": "C10:NEW"},
+                    {"id": 2, "stageId": "C10:EXECUTING"},
+                    {"id": 3, "stageId": "C10:WON"},
+                ]
+            }
+        )
+
+        result = count_member_load(fake_client, "ASSIGNED_BY_ID", ["NEW", "EXECUTING"], "6496")
+
+        self.assertEqual(2, result)
 
 
 if __name__ == "__main__":
