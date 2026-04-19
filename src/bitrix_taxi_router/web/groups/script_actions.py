@@ -24,6 +24,7 @@ GROUPS_PAGE_SCRIPT_ACTIONS = """    async function persistDistributionConfig(pay
       try {
         await persistDistributionConfig(collectDistributionConfigFromForm());
         distributionState.openFormRequested = false;
+        distributionState.formMode = "edit";
         showDistributionLanding();
         renderDistributionGroupsPanel();
       } catch (error) {
@@ -78,6 +79,7 @@ GROUPS_PAGE_SCRIPT_ACTIONS = """    async function persistDistributionConfig(pay
         distributionState.config = null;
         distributionState.isConfigLoaded = true;
         distributionState.openFormRequested = false;
+        distributionState.formMode = "create";
         distributionState.isLoaded = false;
         showDistributionLanding();
         renderDistributionGroupsPanel();
@@ -117,11 +119,13 @@ GROUPS_PAGE_SCRIPT_ACTIONS = """    async function persistDistributionConfig(pay
 
     function handleCreateDistributionGroupClick() {
       distributionState.openFormRequested = true;
+      distributionState.formMode = "create";
       loadDistributionReferenceData(false);
     }
 
     function handleEditDistributionGroupClick() {
       distributionState.openFormRequested = true;
+      distributionState.formMode = "edit";
       loadDistributionReferenceData(false);
     }
 

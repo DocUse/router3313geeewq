@@ -103,6 +103,9 @@ class AppUiTests(unittest.TestCase):
         self.assertIn("handleEditDistributionGroupClick", response.text)
         self.assertIn("handleToggleDistributionGroupClick", response.text)
         self.assertIn("handleDeleteDistributionGroupClick", response.text)
+        self.assertIn('formMode: "create"', response.text)
+        self.assertIn('distributionState.formMode = "create";', response.text)
+        self.assertIn('distributionState.formMode = "edit";', response.text)
         self.assertIn("Удалить", response.text)
 
     def test_portal_context_endpoint_saves_portal_from_bitrix_auth_payload(self) -> None:

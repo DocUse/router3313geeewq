@@ -66,6 +66,7 @@ GROUPS_PAGE_SCRIPT_STATE = """    const sectionContent = {
       referenceData: null,
       config: null,
       openFormRequested: false,
+      formMode: "create",
       portalContextSyncKey: "",
       portalContextSynced: false,
       isCardActionLoading: false,

@@ -411,7 +411,9 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
 
     function renderDistributionConfigForm() {
       const referenceData = distributionState.referenceData || { users: [], stages: [], responsible_fields: [] };
-      const config = distributionState.config || createDefaultDistributionConfig(referenceData);
+      const config = distributionState.formMode === "create"
+        ? createDefaultDistributionConfig(referenceData)
+        : (distributionState.config || createDefaultDistributionConfig(referenceData));
 
       groupNameInput.value = config.name || "";
       distributionTypeSelect.value = config.distribution_type || "round_robin_load_time";
@@ -507,11 +509,13 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
 
       if (!isDistribution && !isStats) {
         distributionState.openFormRequested = false;
+        distributionState.formMode = "edit";
         sectionBadge.textContent = content.badge;
         sectionTitle.textContent = content.title;
         sectionDescription.textContent = content.description;
       } else if (isDistribution) {
         distributionState.openFormRequested = false;
+        distributionState.formMode = "edit";
         showDistributionLanding();
         loadDistributionConfigData(false);
       } else {
