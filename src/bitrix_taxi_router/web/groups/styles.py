@@ -889,10 +889,6 @@ GROUPS_PAGE_STYLES = """    :root {
       gap: 18px;
     }
 
-    .stats-grid--distribution {
-      align-items: start;
-    }
-
     .stats-grid--full {
       grid-template-columns: minmax(0, 1fr);
     }
