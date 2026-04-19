@@ -889,17 +889,13 @@ GROUPS_PAGE_STYLES = """    :root {
       gap: 18px;
     }
 
-    .stats-grid--distribution {
-      align-items: start;
-    }
-
     .stats-grid--full {
       grid-template-columns: minmax(0, 1fr);
     }
 
     .stats-summary-grid {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 12px;
     }
 
@@ -943,7 +939,7 @@ GROUPS_PAGE_STYLES = """    :root {
 
     .stats-table {
       width: 100%;
-      min-width: 720px;
+      min-width: 860px;
       border-collapse: collapse;
     }
 
@@ -1144,6 +1140,6 @@ GROUPS_PAGE_STYLES = """    :root {
       }
 
       .stats-summary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
       }
     }"""

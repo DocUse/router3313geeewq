@@ -116,7 +116,30 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
       }
     }
 
-    async function loadStatsData(forceReload) {
+    function stopStatsAutoRefresh() {
+      if (!statsState.autoRefreshTimerId) {
+        return;
+      }
+      window.clearInterval(statsState.autoRefreshTimerId);
+      statsState.autoRefreshTimerId = 0;
+    }
+
+    function syncStatsAutoRefresh() {
+      const shouldAutoRefresh = statsState.isActiveView && !document.hidden;
+      if (!shouldAutoRefresh) {
+        stopStatsAutoRefresh();
+        return;
+      }
+      if (statsState.autoRefreshTimerId) {
+        return;
+      }
+      statsState.autoRefreshTimerId = window.setInterval(() => {
+        loadStatsData(true, { silent: true });
+      }, 30000);
+    }
+
+    async function loadStatsData(forceReload, options) {
+      const isSilent = Boolean(options && options.silent);
       if (statsState.isLoading) {
         return;
       }
@@ -133,15 +156,19 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
       }
 
       statsState.isLoading = true;
-      setStatsStatus("Загружаем журнал распределения...");
+      if (!isSilent) {
+        setStatsStatus("Загружаем журнал распределения...");
+      }
       try {
         await syncPortalContextFromBitrix(false);
-        await ensureStatsUsersLoaded(forceReload);
+        await ensureStatsUsersLoaded(false);
         const payload = await fetchJson(`/api/ui/stats?member_id=${encodeURIComponent(distributionMemberId)}`);
         statsState.data = payload;
         statsState.isLoaded = true;
         renderStatsData(payload);
-        setStatsStatus("Журнал и runtime-данные обновлены.", "is-success");
+        if (!isSilent) {
+          setStatsStatus("Журнал и runtime-данные обновлены.", "is-success");
+        }
       } catch (error) {
         setStatsStatus(error.message || "Не удалось загрузить статистику.", "is-error");
         renderStatsData({});

@@ -57,7 +57,6 @@ GROUPS_PAGE_SCRIPT_STATE = """    const sectionContent = {
     const statsDiagnosticsList = document.getElementById("statsDiagnosticsList");
     const statsDiagnosticsCount = document.getElementById("statsDiagnosticsCount");
     const statsJournalList = document.getElementById("statsJournalList");
-    const runDeliveryCheckButton = document.getElementById("runDeliveryCheckButton");
     const refreshStatsButton = document.getElementById("refreshStatsButton");
     const initialDistributionMemberId = __INITIAL_MEMBER_ID__;
     const distributionState = {
@@ -79,5 +78,7 @@ GROUPS_PAGE_SCRIPT_STATE = """    const sectionContent = {
       isLoaded: false,
       isLoading: false,
       data: null,
+      isActiveView: false,
+      autoRefreshTimerId: 0,
     };
 """
