@@ -74,6 +74,19 @@ def register_ui_data_routes(app: FastAPI, *, service: PortalService, settings: S
         )
         return {"status": "ok", "config": saved, "event_binding": binding}
 
+    @app.delete("/api/ui/groups/config")
+    async def groups_config_delete(request: Request) -> dict[str, object]:
+        member_id = require_member_id(request)
+        deleted = load_reference_data(service.delete_distribution_group, member_id)
+        record_app_diagnostic_log(
+            service,
+            source="distribution_config",
+            message="Deleted distribution group configuration.",
+            portal_member_id=member_id,
+            details={"deleted": deleted},
+        )
+        return {"status": "ok", "deleted": deleted, "config": None}
+
     @app.post("/api/ui/groups/portal-context")
     async def groups_portal_context(request: Request) -> dict[str, object]:
         payload = normalize_bitrix_payload(await read_bitrix_payload(request))

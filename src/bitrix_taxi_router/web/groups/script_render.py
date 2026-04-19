@@ -7,9 +7,15 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
       }
     }
 
+    function clearDistributionStatus() {
+      distributionStatus.hidden = true;
+      distributionStatus.textContent = "";
+      distributionStatus.classList.remove("is-error", "is-success");
+    }
+
     function showDistributionLanding() {
       distributionGroupsPanel.hidden = false;
-      distributionStatus.hidden = true;
+      clearDistributionStatus();
       distributionForm.hidden = true;
     }
 
@@ -50,16 +56,28 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
       const header = document.createElement("div");
       header.className = "distribution-group-card-head";
 
-      const checkbox = document.createElement("span");
+      const checkbox = document.createElement("button");
       checkbox.className = "distribution-group-checkbox";
-      checkbox.setAttribute("aria-hidden", "true");
+      checkbox.type = "button";
+      checkbox.setAttribute("aria-label", config.is_active ? "Выключить группу" : "Включить группу");
+      checkbox.setAttribute("aria-pressed", config.is_active ? "true" : "false");
+      checkbox.disabled = Boolean(distributionState.isCardActionLoading);
       checkbox.textContent = config.is_active ? "✓" : "";
+      checkbox.addEventListener("click", handleToggleDistributionGroupClick);
 
       const title = document.createElement("h3");
       title.className = "distribution-group-title";
       title.textContent = config.name || "Группа распределения";
 
-      header.append(checkbox, title);
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "distribution-group-title-wrap";
+
+      const statusBadge = document.createElement("span");
+      statusBadge.className = `distribution-group-status${config.is_active ? " is-active" : " is-inactive"}`;
+      statusBadge.textContent = config.is_active ? "Активна" : "Неактивна";
+
+      titleWrap.append(title, statusBadge);
+      header.append(checkbox, titleWrap);
 
       const subtitle = document.createElement("p");
       subtitle.className = "distribution-group-subtitle";
@@ -86,9 +104,17 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
       editButton.className = "distribution-group-edit";
       editButton.type = "button";
       editButton.textContent = "Изменить";
+      editButton.disabled = Boolean(distributionState.isCardActionLoading);
       editButton.addEventListener("click", handleEditDistributionGroupClick);
 
-      actions.appendChild(editButton);
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "distribution-group-delete";
+      deleteButton.type = "button";
+      deleteButton.textContent = "Удалить";
+      deleteButton.disabled = Boolean(distributionState.isCardActionLoading);
+      deleteButton.addEventListener("click", handleDeleteDistributionGroupClick);
+
+      actions.append(editButton, deleteButton);
       card.append(header, subtitle, description, actions);
       distributionGroupsList.appendChild(card);
     }
@@ -466,7 +492,7 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
         limitInput.value = bulkValue;
       });
 
-      setDistributionStatus("Лимиты обновлены в форме. Чтобы сохранить группу, нажмите «Применить».", "is-success");
+      clearDistributionStatus();
     }
 
     function setActiveView(view) {

@@ -10,6 +10,7 @@ from .bitrix.normalizers import normalize_users
 from .contracts import PortalAuth
 from .database import Database
 from .services.config_store import get_distribution_group as load_distribution_group
+from .services.config_store import delete_distribution_group as remove_distribution_group
 from .services.config_store import save_distribution_group as persist_distribution_group
 from .services.diagnostic_store import record_diagnostic_log as persist_diagnostic_log
 from .services.event_binding import ensure_configured_deal_created_event_binding as ensure_configured_binding
@@ -119,6 +120,13 @@ class PortalService:
             ensure_portal_exists=self.get_portal,
             load_distribution_group=self.get_distribution_group,
             now_factory=_iso_now,
+        )
+
+    def delete_distribution_group(self, portal_member_id: str) -> bool:
+        return remove_distribution_group(
+            self.database,
+            portal_member_id,
+            ensure_portal_exists=self.get_portal,
         )
 
     def ensure_deal_created_event_binding(self, portal_member_id: str, handler_url: str) -> dict[str, object]:

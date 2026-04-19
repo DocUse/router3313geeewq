@@ -68,6 +68,7 @@ GROUPS_PAGE_SCRIPT_STATE = """    const sectionContent = {
       openFormRequested: false,
       portalContextSyncKey: "",
       portalContextSynced: false,
+      isCardActionLoading: false,
     };
     const statsState = {
       isLoaded: false,

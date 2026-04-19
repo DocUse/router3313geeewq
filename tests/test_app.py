@@ -101,6 +101,9 @@ class AppUiTests(unittest.TestCase):
         self.assertIn("/api/ui/groups/config", response.text)
         self.assertIn("loadDistributionConfigData(false);", response.text)
         self.assertIn("handleEditDistributionGroupClick", response.text)
+        self.assertIn("handleToggleDistributionGroupClick", response.text)
+        self.assertIn("handleDeleteDistributionGroupClick", response.text)
+        self.assertIn("Удалить", response.text)
 
     def test_portal_context_endpoint_saves_portal_from_bitrix_auth_payload(self) -> None:
         response = self.client.post(
@@ -179,6 +182,41 @@ class AppUiTests(unittest.TestCase):
             ],
             get_response.json()["config"]["members"],
         )
+
+    def test_distribution_group_config_endpoint_deletes_config(self) -> None:
+        self.client.post(
+            "/api/ui/groups/portal-context",
+            json={
+                "AUTH_ID": "token-1",
+                "REFRESH_ID": "refresh-1",
+                "DOMAIN": "portal.example.bitrix24.ru",
+                "PROTOCOL": "1",
+                "member_id": "portal-789",
+            },
+        )
+        self.client.post(
+            "/api/ui/groups/config?member_id=portal-789",
+            json={
+                "name": "Основная группа",
+                "distribution_type": "round_robin_load_time",
+                "event_type": "deal_created",
+                "distribution_stage_id": "NEW",
+                "load_stage_ids": ["NEW"],
+                "responsible_field_id": "ASSIGNED_BY_ID",
+                "wait_seconds": 120,
+                "retry_interval_seconds": 30,
+                "is_active": True,
+                "members": [{"user_id": "10", "limit": 3}],
+            },
+        )
+
+        delete_response = self.client.delete("/api/ui/groups/config?member_id=portal-789")
+
+        self.assertEqual(200, delete_response.status_code)
+        self.assertEqual({"status": "ok", "deleted": True, "config": None}, delete_response.json())
+        get_response = self.client.get("/api/ui/groups/config?member_id=portal-789")
+        self.assertEqual(200, get_response.status_code)
+        self.assertEqual({"config": None}, get_response.json())
 
     def test_stats_endpoint_returns_distribution_runtime_journal(self) -> None:
         self.client.post(

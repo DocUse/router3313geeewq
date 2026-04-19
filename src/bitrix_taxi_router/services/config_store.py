@@ -97,6 +97,21 @@ def save_distribution_group(
     return saved
 
 
+def delete_distribution_group(
+    database: Database,
+    portal_member_id: str,
+    *,
+    ensure_portal_exists: Callable[[str], object],
+) -> bool:
+    ensure_portal_exists(portal_member_id)
+    with database.connection() as connection:
+        cursor = connection.execute(
+            "DELETE FROM distribution_group_configs WHERE portal_member_id = ?",
+            (portal_member_id,),
+        )
+    return int(cursor.rowcount) > 0
+
+
 def parse_json_list(raw_value: Any, field_name: str) -> list[dict[str, object]] | list[str]:
     try:
         parsed = json.loads(str(raw_value or "[]"))

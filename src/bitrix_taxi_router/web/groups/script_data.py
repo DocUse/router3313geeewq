@@ -139,11 +139,7 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
       }
       if (distributionState.isConfigLoaded && !forceReload) {
         renderDistributionGroupsPanel();
-        if (distributionState.config) {
-          setDistributionStatus("Сохраненная группа загружена.", "is-success");
-        } else {
-          setDistributionStatus("Пока не сохранено ни одной группы. Нажмите «Добавить новую группу».", "is-success");
-        }
+        clearDistributionStatus();
         return;
       }
 
@@ -159,7 +155,6 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
 
       distributionState.isConfigLoading = true;
       showDistributionLanding();
-      setDistributionStatus("Загружаем сохраненную группу...");
       try {
         await syncPortalContextFromBitrix(false);
         const configPayload = await fetchJson(`/api/ui/groups/config?member_id=${encodeURIComponent(distributionMemberId)}`);
@@ -170,11 +165,7 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
           : null;
         distributionState.isConfigLoaded = true;
         renderDistributionGroupsPanel();
-        if (configPayload.config) {
-          setDistributionStatus("Сохраненная группа загружена.", "is-success");
-        } else {
-          setDistributionStatus("Пока не сохранено ни одной группы. Нажмите «Добавить новую группу».", "is-success");
-        }
+        clearDistributionStatus();
       } catch (error) {
         renderDistributionGroupsPanel();
         setDistributionStatus(error.message || "Не удалось загрузить сохраненную группу.", "is-error");
@@ -228,11 +219,7 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
         distributionState.isConfigLoaded = true;
         if (distributionState.openFormRequested) {
           renderDistributionConfigForm();
-          if (configPayload.config) {
-            setDistributionStatus("Сохраненная конфигурация группы загружена. Изменения применяются кнопкой «Применить».", "is-success");
-          } else {
-            setDistributionStatus("Справочники Bitrix24 загружены. Заполните форму и нажмите «Применить».", "is-success");
-          }
+          clearDistributionStatus();
         } else {
           showDistributionLanding();
           renderDistributionGroupsPanel();

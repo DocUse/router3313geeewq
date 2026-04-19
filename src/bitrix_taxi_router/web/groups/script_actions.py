@@ -1,34 +1,91 @@
-GROUPS_PAGE_SCRIPT_ACTIONS = """    async function saveDistributionConfig() {
+GROUPS_PAGE_SCRIPT_ACTIONS = """    async function persistDistributionConfig(payload) {
       const distributionMemberId = await resolveDistributionMemberId();
       if (!distributionMemberId) {
-        setDistributionStatus("Не удалось определить member_id портала для сохранения.", "is-error");
-        return;
+        throw new Error("Не удалось определить member_id портала для сохранения.");
       }
-
-      setDistributionStatus("Сохраняем конфигурацию группы распределения...");
-
-      try {
-        const payload = collectDistributionConfigFromForm();
-        const response = await fetchJson(
-          `/api/ui/groups/config?member_id=${encodeURIComponent(distributionMemberId)}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
+      const response = await fetchJson(
+        `/api/ui/groups/config?member_id=${encodeURIComponent(distributionMemberId)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        );
+          body: JSON.stringify(payload),
+        },
+      );
+      distributionState.config = normalizeLoadedDistributionConfig(response.config, distributionState.referenceData || { users: [], stages: [], responsible_fields: [] });
+      distributionState.isConfigLoaded = true;
+      statsState.isLoaded = false;
+      return response;
+    }
 
-        distributionState.config = normalizeLoadedDistributionConfig(response.config, distributionState.referenceData);
-        distributionState.isConfigLoaded = true;
-        statsState.isLoaded = false;
+    async function saveDistributionConfig() {
+      setDistributionStatus("Сохраняем конфигурацию группы распределения...");
+      try {
+        await persistDistributionConfig(collectDistributionConfigFromForm());
         distributionState.openFormRequested = false;
         showDistributionLanding();
         renderDistributionGroupsPanel();
-        setDistributionStatus("Группа распределения сохранена и отображена в разделе.", "is-success");
       } catch (error) {
         setDistributionStatus(error.message || "Не удалось сохранить конфигурацию группы.", "is-error");
+      }
+    }
+
+    async function handleToggleDistributionGroupClick() {
+      if (!distributionState.config || distributionState.isCardActionLoading) {
+        return;
+      }
+
+      distributionState.isCardActionLoading = true;
+      clearDistributionStatus();
+      renderDistributionGroupsPanel();
+      try {
+        await persistDistributionConfig({
+          ...distributionState.config,
+          is_active: !distributionState.config.is_active,
+        });
+        renderDistributionGroupsPanel();
+      } catch (error) {
+        renderDistributionGroupsPanel();
+        setDistributionStatus(error.message || "Не удалось изменить активность группы.", "is-error");
+      } finally {
+        distributionState.isCardActionLoading = false;
+        renderDistributionGroupsPanel();
+      }
+    }
+
+    async function handleDeleteDistributionGroupClick() {
+      if (!distributionState.config || distributionState.isCardActionLoading) {
+        return;
+      }
+      if (!window.confirm("Удалить группу распределения?")) {
+        return;
+      }
+
+      const distributionMemberId = await resolveDistributionMemberId();
+      if (!distributionMemberId) {
+        setDistributionStatus("Не удалось определить member_id портала для удаления.", "is-error");
+        return;
+      }
+
+      distributionState.isCardActionLoading = true;
+      clearDistributionStatus();
+      renderDistributionGroupsPanel();
+      try {
+        await fetchJson(`/api/ui/groups/config?member_id=${encodeURIComponent(distributionMemberId)}`, {
+          method: "DELETE",
+        });
+        distributionState.config = null;
+        distributionState.isConfigLoaded = true;
+        distributionState.openFormRequested = false;
+        distributionState.isLoaded = false;
+        showDistributionLanding();
+        renderDistributionGroupsPanel();
+      } catch (error) {
+        setDistributionStatus(error.message || "Не удалось удалить группу.", "is-error");
+      } finally {
+        distributionState.isCardActionLoading = false;
+        renderDistributionGroupsPanel();
       }
     }
 

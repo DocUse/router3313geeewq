@@ -280,6 +280,14 @@ GROUPS_PAGE_STYLES = """    :root {
       align-items: center;
     }
 
+    .distribution-group-title-wrap {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-start;
+    }
+
     .distribution-group-checkbox {
       width: 20px;
       height: 20px;
@@ -294,12 +302,24 @@ GROUPS_PAGE_STYLES = """    :root {
       font-size: 13px;
       line-height: 1;
       font-weight: 700;
+      cursor: pointer;
+      padding: 0;
     }
 
     .distribution-group-card.is-inactive .distribution-group-checkbox {
       background: transparent;
       color: transparent;
       border-color: #cdd6ea;
+    }
+
+    .distribution-group-checkbox:disabled {
+      cursor: default;
+      opacity: 0.7;
+    }
+
+    .distribution-group-checkbox:focus-visible {
+      outline: 2px solid rgba(46, 123, 244, 0.35);
+      outline-offset: 2px;
     }
 
     .distribution-group-title {
@@ -309,6 +329,27 @@ GROUPS_PAGE_STYLES = """    :root {
       font-weight: 700;
       color: #333333;
       word-break: break-word;
+    }
+
+    .distribution-group-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      line-height: 1.3;
+      font-weight: 600;
+    }
+
+    .distribution-group-status.is-active {
+      background: rgba(38, 182, 102, 0.12);
+      color: #17874a;
+    }
+
+    .distribution-group-status.is-inactive {
+      background: rgba(235, 72, 77, 0.12);
+      color: #c13a3f;
     }
 
     .distribution-group-subtitle,
@@ -351,6 +392,31 @@ GROUPS_PAGE_STYLES = """    :root {
 
     .distribution-group-edit:hover {
       opacity: 0.92;
+    }
+
+    .distribution-group-delete {
+      min-width: 81px;
+      height: 27px;
+      border: 0;
+      border-radius: 10px;
+      background: #eb484d;
+      color: #ffffff;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.3;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 0 12px;
+    }
+
+    .distribution-group-delete:hover {
+      opacity: 0.92;
+    }
+
+    .distribution-group-edit:disabled,
+    .distribution-group-delete:disabled {
+      cursor: default;
+      opacity: 0.7;
     }
 
     .reference-status {
