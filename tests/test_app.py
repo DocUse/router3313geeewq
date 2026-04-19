@@ -319,6 +319,7 @@ class AppUiTests(unittest.TestCase):
         self.assertEqual(1, payload["distribution"]["assigned_total"])
         self.assertEqual("10", payload["distribution"]["items"][0]["user_id"])
         self.assertEqual(1, payload["distribution"]["items"][0]["assigned_count"])
+        self.assertEqual(3, payload["distribution"]["items"][0]["limit"])
         self.assertEqual("700", payload["distribution"]["items"][0]["last_assigned_deal_id"])
         self.assertIn(
             "Received POST /api/bitrix/events hit.",

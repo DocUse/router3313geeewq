@@ -107,7 +107,7 @@ GROUPS_PAGE_MARKUP = """</head>
                       <tr>
                         <th scope="col">Менеджер</th>
                         <th scope="col">Группа</th>
-                        <th scope="col">Сделок</th>
+                        <th scope="col">Назначено / лимит</th>
                         <th scope="col">Последняя сделка</th>
                         <th scope="col">Последнее назначение</th>
                       </tr>

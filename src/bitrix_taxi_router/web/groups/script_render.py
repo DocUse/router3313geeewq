@@ -296,7 +296,13 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
         groupCell.textContent = item.group_name || distribution.group_name || "Группа не настроена";
 
         const dealsCell = document.createElement("td");
-        dealsCell.textContent = String(item.assigned_count || 0);
+        const dealsPrimary = document.createElement("div");
+        dealsPrimary.className = "stats-table-primary";
+        dealsPrimary.textContent = String(item.assigned_count || 0);
+        const dealsSecondary = document.createElement("div");
+        dealsSecondary.className = "stats-table-secondary";
+        dealsSecondary.textContent = `Лимит: ${item.limit === 0 || item.limit ? item.limit : "—"}`;
+        dealsCell.append(dealsPrimary, dealsSecondary);
 
         const dealCell = document.createElement("td");
         dealCell.textContent = item.last_assigned_deal_id ? `#${item.last_assigned_deal_id}` : "—";

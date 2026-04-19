@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from ..database import Database
 from .common import as_optional_str
+from .common import coerce_int
 from .config_store import parse_json_object
 
 JOURNAL_LIMIT = 100
@@ -23,6 +24,11 @@ def get_distribution_statistics(
     configured_members = config.get("members") if isinstance(config, dict) else []
     member_names = {
         str(member.get("user_id")): str(member.get("user_id"))
+        for member in configured_members
+        if isinstance(member, dict) and str(member.get("user_id") or "").strip()
+    }
+    member_limits = {
+        str(member.get("user_id")): coerce_int(member.get("limit"), field_name=f"Member limit for {member.get('user_id')}")
         for member in configured_members
         if isinstance(member, dict) and str(member.get("user_id") or "").strip()
     }
@@ -122,6 +128,7 @@ def get_distribution_statistics(
             "user_name": member_names.get(user_id) or user_id,
             "group_name": str(config.get("name") or "").strip() if isinstance(config, dict) else "",
             "assigned_count": int(assigned_counter.get(user_id, 0)),
+            "limit": member_limits.get(user_id),
             "last_assigned_deal_id": member_runtime_by_user_id.get(user_id, {}).get("last_assigned_deal_id"),
             "last_assigned_at": member_runtime_by_user_id.get(user_id, {}).get("last_assigned_at"),
             "updated_at": member_runtime_by_user_id.get(user_id, {}).get("updated_at"),
