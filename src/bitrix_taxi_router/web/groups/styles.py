@@ -283,9 +283,9 @@ GROUPS_PAGE_STYLES = """    :root {
     .distribution-group-title-wrap {
       min-width: 0;
       display: flex;
-      flex-direction: column;
-      gap: 6px;
-      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      align-items: center;
     }
 
     .distribution-group-checkbox {
@@ -324,6 +324,7 @@ GROUPS_PAGE_STYLES = """    :root {
 
     .distribution-group-title {
       margin: 0;
+      flex: 0 1 auto;
       font-size: 16px;
       line-height: 1.5;
       font-weight: 700;
@@ -333,6 +334,7 @@ GROUPS_PAGE_STYLES = """    :root {
 
     .distribution-group-status {
       display: inline-flex;
+      flex: 0 0 auto;
       align-items: center;
       min-height: 24px;
       padding: 3px 10px;
