@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from time import perf_counter
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -40,6 +41,7 @@ def handle_deal_created_event(
     distribution_event_deal_created: str,
 ) -> dict[str, object]:
     get_portal(portal_member_id)
+    processing_started_at = perf_counter()
 
     existing_runtime = get_deal_runtime(
         database,
@@ -65,6 +67,7 @@ def handle_deal_created_event(
         )
         return result
 
+    timings_ms: dict[str, int] = {}
     config = get_distribution_group(portal_member_id)
     if config is None:
         logger.info("Ignoring deal assignment portal=%s deal_id=%s: no config", portal_member_id, deal_id)
@@ -144,9 +147,12 @@ def handle_deal_created_event(
         )
 
     client = get_bitrix_client(portal_member_id)
+    deal_fetch_started_at = perf_counter()
     deal = get_deal_item(client, deal_id)
+    timings_ms["deal_fetch"] = _elapsed_ms(deal_fetch_started_at)
     current_stage_id = extract_deal_stage_id(deal)
     if current_stage_id != str(config["distribution_stage_id"]):
+        timings_ms["total_processing"] = _elapsed_ms(processing_started_at)
         logger.info(
             "Ignoring deal assignment portal=%s deal_id=%s: stage=%s expected=%s",
             portal_member_id,
@@ -162,6 +168,7 @@ def handle_deal_created_event(
             details={
                 "current_stage_id": current_stage_id or "",
                 "expected_stage_id": str(config["distribution_stage_id"]),
+                "timings_ms": timings_ms,
             },
         )
         return record_and_return_deal_runtime(
@@ -174,13 +181,16 @@ def handle_deal_created_event(
             now_factory=now_factory,
         )
 
+    selection_started_at = perf_counter()
     selection = select_distribution_candidate(
         portal_member_id,
         client,
         config,
         last_assigned_map=get_member_last_assigned_map(database, portal_member_id),
     )
+    timings_ms["load_selection"] = _elapsed_ms(selection_started_at)
     if selection["selected_member"] is None:
+        timings_ms["total_processing"] = _elapsed_ms(processing_started_at)
         logger.info(
             "No available members for portal=%s deal_id=%s loads=%s",
             portal_member_id,
@@ -192,7 +202,7 @@ def handle_deal_created_event(
             message="No available distribution members: all limits are reached.",
             portal_member_id=portal_member_id,
             deal_id=deal_id,
-            details={"loads": selection["loads"]},
+            details={"loads": selection["loads"], "timings_ms": timings_ms},
         )
         return record_and_return_deal_runtime(
             database,
@@ -201,7 +211,7 @@ def handle_deal_created_event(
             event_type=distribution_event_deal_created,
             status="waiting",
             note="All distribution members reached their limits",
-            extra={"loads": selection["loads"]},
+            extra={"loads": selection["loads"], "timings_ms": timings_ms},
             now_factory=now_factory,
         )
 
@@ -209,7 +219,10 @@ def handle_deal_created_event(
     selected_user_id = str(selected_member["user_id"])
     responsible_field_id = str(config["responsible_field_id"])
 
+    assignment_started_at = perf_counter()
     assign_deal_to_member(client, deal_id, responsible_field_id, selected_user_id)
+    timings_ms["deal_assignment"] = _elapsed_ms(assignment_started_at)
+    timings_ms["total_processing"] = _elapsed_ms(processing_started_at)
     touch_member_runtime(
         database,
         portal_member_id,
@@ -234,6 +247,7 @@ def handle_deal_created_event(
             "user_id": selected_user_id,
             "responsible_field_id": responsible_field_id,
             "loads": selection["loads"],
+            "timings_ms": timings_ms,
         },
     )
     return record_and_return_deal_runtime(
@@ -245,7 +259,7 @@ def handle_deal_created_event(
         assigned_user_id=selected_user_id,
         assigned_field_id=responsible_field_id,
         note="Deal assigned after load calculation",
-        extra={"loads": selection["loads"]},
+        extra={"loads": selection["loads"], "timings_ms": timings_ms},
         now_factory=now_factory,
     )
 
@@ -270,3 +284,7 @@ def get_deal_item(client: BitrixListClient, deal_id: str) -> dict[str, Any]:
 
 def extract_deal_stage_id(deal: dict[str, Any]) -> str:
     return str(deal.get("stageId") or deal.get("STAGE_ID") or "").strip()
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return max(0, int(round((perf_counter() - started_at) * 1000)))

@@ -193,8 +193,20 @@ GROUPS_PAGE_STYLES = """    :root {
 
     .distribution-groups-panel {
       display: flex;
-      flex-direction: column;
+      flex-wrap: wrap;
+      align-items: stretch;
       gap: 24px;
+    }
+
+    .distribution-groups-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .distribution-groups-list:empty {
+      display: none;
     }
 
     .distribution-create-card {
@@ -244,6 +256,101 @@ GROUPS_PAGE_STYLES = """    :root {
       font-weight: 600;
       color: #333333;
       text-align: center;
+    }
+
+    .distribution-group-card {
+      width: 340px;
+      min-height: 205px;
+      border: 1px solid rgba(46, 123, 244, 0.1);
+      border-radius: 10px;
+      background: #fbfbfe;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .distribution-group-card.is-inactive {
+      opacity: 0.84;
+    }
+
+    .distribution-group-card-head {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .distribution-group-checkbox {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 20px;
+      border-radius: 6px;
+      border: 1px solid #0070ff;
+      background: #0070ff;
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 700;
+    }
+
+    .distribution-group-card.is-inactive .distribution-group-checkbox {
+      background: transparent;
+      color: transparent;
+      border-color: #cdd6ea;
+    }
+
+    .distribution-group-title {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.5;
+      font-weight: 700;
+      color: #333333;
+      word-break: break-word;
+    }
+
+    .distribution-group-subtitle,
+    .distribution-group-description {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.35;
+      font-weight: 500;
+      color: #5c5c5c;
+      word-break: break-word;
+    }
+
+    .distribution-group-description strong {
+      font-weight: 600;
+      color: #333333;
+    }
+
+    .distribution-group-actions {
+      margin-top: auto;
+      display: flex;
+      justify-content: flex-start;
+      gap: 12px;
+      padding-top: 4px;
+    }
+
+    .distribution-group-edit {
+      min-width: 81px;
+      height: 27px;
+      border: 0;
+      border-radius: 10px;
+      background: #2e7bf4;
+      color: #ffffff;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.3;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 0 12px;
+    }
+
+    .distribution-group-edit:hover {
+      opacity: 0.92;
     }
 
     .reference-status {
@@ -766,6 +873,11 @@ GROUPS_PAGE_STYLES = """    :root {
       .participant-row,
       .load-stages-layout {
         grid-template-columns: 1fr;
+      }
+
+      .distribution-groups-panel,
+      .distribution-groups-list {
+        flex-direction: column;
       }
 
       .distribution-row {

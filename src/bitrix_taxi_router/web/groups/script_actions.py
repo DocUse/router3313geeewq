@@ -21,9 +21,12 @@ GROUPS_PAGE_SCRIPT_ACTIONS = """    async function saveDistributionConfig() {
         );
 
         distributionState.config = normalizeLoadedDistributionConfig(response.config, distributionState.referenceData);
+        distributionState.isConfigLoaded = true;
         statsState.isLoaded = false;
-        renderDistributionConfigForm();
-        setDistributionStatus("Группа распределения сохранена. После перезагрузки конфигурация будет поднята из базы.", "is-success");
+        distributionState.openFormRequested = false;
+        showDistributionLanding();
+        renderDistributionGroupsPanel();
+        setDistributionStatus("Группа распределения сохранена и отображена в разделе.", "is-success");
       } catch (error) {
         setDistributionStatus(error.message || "Не удалось сохранить конфигурацию группы.", "is-error");
       }
@@ -57,7 +60,12 @@ GROUPS_PAGE_SCRIPT_ACTIONS = """    async function saveDistributionConfig() {
 
     function handleCreateDistributionGroupClick() {
       distributionState.openFormRequested = true;
-      loadDistributionReferenceData();
+      loadDistributionReferenceData(false);
+    }
+
+    function handleEditDistributionGroupClick() {
+      distributionState.openFormRequested = true;
+      loadDistributionReferenceData(false);
     }
 
     applyBulkLimitButton.addEventListener("click", applyBulkLimitFromForm);

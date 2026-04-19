@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 from typing import Protocol
 
+from ..bitrix_api import BitrixApiError
 from .common import coerce_int
 from .common import maybe_int
 
@@ -95,14 +96,17 @@ def count_member_loads(
     if not normalized_user_ids:
         return {}
 
-    items = client.call_list(
-        "crm.item.list",
-        {
-            "entityTypeId": DEAL_ENTITY_TYPE_ID,
-            "select": ["id", "stageId", filter_field],
-            "useOriginalUfNames": "Y",
-        },
-    )
+    base_params = {
+        "entityTypeId": DEAL_ENTITY_TYPE_ID,
+        "select": ["id", "stageId", filter_field],
+        "useOriginalUfNames": "Y",
+    }
+    filtered_params = dict(base_params)
+    filtered_params["filter"] = {f"@{filter_field}": [maybe_int(user_id) for user_id in normalized_user_ids]}
+    try:
+        items = client.call_list("crm.item.list", filtered_params)
+    except BitrixApiError:
+        items = client.call_list("crm.item.list", base_params)
     configured_stage_ids = [str(stage_id) for stage_id in load_stage_ids]
     loads = {user_id: 0 for user_id in normalized_user_ids}
     for item in items:

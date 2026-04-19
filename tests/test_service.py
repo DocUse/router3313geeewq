@@ -15,6 +15,7 @@ from bitrix_taxi_router.bitrix_api import BitrixClient
 from bitrix_taxi_router.database import Database
 from bitrix_taxi_router.service import PortalService
 from bitrix_taxi_router.services.assignment import count_member_load
+from bitrix_taxi_router.services.assignment import count_member_loads
 
 
 class FakeBitrixClient:
@@ -551,6 +552,33 @@ class PortalServiceTests(unittest.TestCase):
         result = count_member_load(fake_client, "ASSIGNED_BY_ID", ["NEW", "IN_PROGRESS"], "6496")
 
         self.assertEqual(2, result)
+
+    def test_count_member_loads_requests_bitrix_list_with_responsible_filter(self) -> None:
+        fake_client = FakeBitrixClient(
+            {
+                "crm.item.list": [
+                    {"id": 1, "stageId": "NEW", "assignedById": 10},
+                    {"id": 2, "stageId": "NEW", "assignedById": 20},
+                ]
+            }
+        )
+
+        result = count_member_loads(fake_client, "ASSIGNED_BY_ID", ["NEW"], ["10", "20"])
+
+        self.assertEqual({"10": 1, "20": 1}, result)
+        self.assertEqual(
+            (
+                "call_list",
+                "crm.item.list",
+                {
+                    "entityTypeId": 2,
+                    "select": ["id", "stageId", "assignedById"],
+                    "useOriginalUfNames": "Y",
+                    "filter": {"@assignedById": [10, 20]},
+                },
+            ),
+            fake_client.calls[0],
+        )
 
 
 if __name__ == "__main__":

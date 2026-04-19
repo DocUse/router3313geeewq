@@ -31,6 +31,7 @@ GROUPS_PAGE_SCRIPT_STATE = """    const sectionContent = {
     const menuButtons = document.querySelectorAll("[data-view]");
     const distributionStatus = document.getElementById("distributionStatus");
     const distributionGroupsPanel = document.getElementById("distributionGroupsPanel");
+    const distributionGroupsList = document.getElementById("distributionGroupsList");
     const createDistributionGroupButton = document.getElementById("createDistributionGroupButton");
     const distributionForm = document.getElementById("distributionForm");
     const groupNameInput = document.getElementById("groupNameInput");
@@ -58,11 +59,15 @@ GROUPS_PAGE_SCRIPT_STATE = """    const sectionContent = {
     const distributionState = {
       isLoaded: false,
       isLoading: false,
+      isConfigLoaded: false,
+      isConfigLoading: false,
       memberId: initialDistributionMemberId || new URLSearchParams(window.location.search).get("member_id") || "",
       auth: null,
       referenceData: null,
       config: null,
       openFormRequested: false,
+      portalContextSyncKey: "",
+      portalContextSynced: false,
     };
     const statsState = {
       isLoaded: false,

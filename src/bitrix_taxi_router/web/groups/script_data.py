@@ -58,10 +58,15 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
       return distributionState.memberId;
     }
 
-    async function syncPortalContextFromBitrix() {
+    async function syncPortalContextFromBitrix(forceReload) {
       const auth = await resolveBitrixAuth();
       if (!auth || !auth.member_id || !auth.domain || !auth.access_token) {
-        return;
+        return false;
+      }
+
+      const syncKey = [auth.member_id, auth.domain, auth.access_token, auth.refresh_token || ""].join("|");
+      if (!forceReload && distributionState.portalContextSynced && distributionState.portalContextSyncKey === syncKey) {
+        return false;
       }
 
       const payload = {
@@ -84,6 +89,9 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
         const errorPayload = await response.json().catch(() => ({}));
         throw new Error(errorPayload.detail || "Не удалось синхронизировать портал с backend.");
       }
+      distributionState.portalContextSyncKey = syncKey;
+      distributionState.portalContextSynced = true;
+      return true;
     }
 
     async function loadStatsData(forceReload) {
@@ -108,7 +116,7 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
       statsState.isLoading = true;
       setStatsStatus("Загружаем журнал распределения...");
       try {
-        await syncPortalContextFromBitrix();
+        await syncPortalContextFromBitrix(false);
         const payload = await fetchJson(`/api/ui/stats?member_id=${encodeURIComponent(distributionMemberId)}`);
         statsState.data = payload;
         statsState.isLoaded = true;
@@ -125,8 +133,58 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
       }
     }
 
-    async function loadDistributionReferenceData() {
-      if (distributionState.isLoaded || distributionState.isLoading) {
+    async function loadDistributionConfigData(forceReload) {
+      if (distributionState.isConfigLoading) {
+        return;
+      }
+      if (distributionState.isConfigLoaded && !forceReload) {
+        renderDistributionGroupsPanel();
+        if (distributionState.config) {
+          setDistributionStatus("Сохраненная группа загружена.", "is-success");
+        } else {
+          setDistributionStatus("Пока не сохранено ни одной группы. Нажмите «Добавить новую группу».", "is-success");
+        }
+        return;
+      }
+
+      const distributionMemberId = await resolveDistributionMemberId();
+      if (!distributionMemberId) {
+        showDistributionLanding();
+        setDistributionStatus(
+          "Не удалось определить member_id портала. Откройте приложение внутри Bitrix24 или завершите повторную установку.",
+          "is-error"
+        );
+        return;
+      }
+
+      distributionState.isConfigLoading = true;
+      showDistributionLanding();
+      setDistributionStatus("Загружаем сохраненную группу...");
+      try {
+        await syncPortalContextFromBitrix(false);
+        const configPayload = await fetchJson(`/api/ui/groups/config?member_id=${encodeURIComponent(distributionMemberId)}`);
+        distributionState.config = configPayload.config
+          ? (distributionState.referenceData
+            ? normalizeLoadedDistributionConfig(configPayload.config, distributionState.referenceData)
+            : configPayload.config)
+          : null;
+        distributionState.isConfigLoaded = true;
+        renderDistributionGroupsPanel();
+        if (configPayload.config) {
+          setDistributionStatus("Сохраненная группа загружена.", "is-success");
+        } else {
+          setDistributionStatus("Пока не сохранено ни одной группы. Нажмите «Добавить новую группу».", "is-success");
+        }
+      } catch (error) {
+        renderDistributionGroupsPanel();
+        setDistributionStatus(error.message || "Не удалось загрузить сохраненную группу.", "is-error");
+      } finally {
+        distributionState.isConfigLoading = false;
+      }
+    }
+
+    async function loadDistributionReferenceData(forceReload) {
+      if ((distributionState.isLoaded && !forceReload) || distributionState.isLoading) {
         if (distributionState.isLoaded) {
           if (distributionState.openFormRequested) {
             renderDistributionConfigForm();
@@ -155,15 +213,19 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
       }
 
       try {
-        await syncPortalContextFromBitrix();
+        await syncPortalContextFromBitrix(false);
+        const configPromise = distributionState.isConfigLoaded && !forceReload
+          ? Promise.resolve({ config: distributionState.config })
+          : fetchJson(`/api/ui/groups/config?member_id=${encodeURIComponent(distributionMemberId)}`);
         const [referencePayload, configPayload] = await Promise.all([
           fetchJson(`/api/ui/groups/reference-data?member_id=${encodeURIComponent(distributionMemberId)}`),
-          fetchJson(`/api/ui/groups/config?member_id=${encodeURIComponent(distributionMemberId)}`),
+          configPromise,
         ]);
 
         distributionState.referenceData = referencePayload;
         distributionState.config = normalizeLoadedDistributionConfig(configPayload.config, referencePayload);
         distributionState.isLoaded = true;
+        distributionState.isConfigLoaded = true;
         if (distributionState.openFormRequested) {
           renderDistributionConfigForm();
           if (configPayload.config) {
@@ -173,6 +235,7 @@ GROUPS_PAGE_SCRIPT_DATA = """    async function fetchJson(url, options) {
           }
         } else {
           showDistributionLanding();
+          renderDistributionGroupsPanel();
         }
       } catch (error) {
         if (distributionState.openFormRequested) {

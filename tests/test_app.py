@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import sqlite3
 import sys
 import tempfile
@@ -86,6 +87,7 @@ class AppUiTests(unittest.TestCase):
         self.assertIn('id="statsJournalList"', response.text)
         self.assertIn('id="runDeliveryCheckButton"', response.text)
         self.assertIn('id="distributionGroupsPanel"', response.text)
+        self.assertIn('id="distributionGroupsList"', response.text)
         self.assertIn('id="createDistributionGroupButton"', response.text)
         self.assertIn('id="distributionForm"', response.text)
         self.assertIn('id="participantsList"', response.text)
@@ -97,6 +99,8 @@ class AppUiTests(unittest.TestCase):
         self.assertIn("BX24.init", response.text)
         self.assertIn("/api/ui/groups/portal-context", response.text)
         self.assertIn("/api/ui/groups/config", response.text)
+        self.assertIn("loadDistributionConfigData(false);", response.text)
+        self.assertIn("handleEditDistributionGroupClick", response.text)
 
     def test_portal_context_endpoint_saves_portal_from_bitrix_auth_payload(self) -> None:
         response = self.client.post(
@@ -536,6 +540,7 @@ class AppUiTests(unittest.TestCase):
             data={
                 "event": "ONCRMDEALADD",
                 "data[FIELDS][ID]": "700",
+                "ts": str(int(time.time()) - 2),
                 "auth[member_id]": "portal-789",
                 "auth[domain]": "portal.example.bitrix24.ru",
             },
@@ -544,6 +549,15 @@ class AppUiTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual("assigned", response.json()["result"]["status"])
         self.assertEqual("10", response.json()["result"]["assigned_user_id"])
+        self.assertIn("timings_ms", response.json()["result"])
+        stats_response = self.client.get("/api/ui/stats?member_id=portal-789")
+        self.assertEqual(200, stats_response.status_code)
+        endpoint_logs = [
+            item for item in stats_response.json()["diagnostics"]
+            if item["message"] == "Received POST /api/bitrix/events hit."
+        ]
+        self.assertTrue(endpoint_logs)
+        self.assertIn("delivery_delay_ms", endpoint_logs[0]["details"])
 
     def test_bitrix_event_probe_is_available_via_get(self) -> None:
         response = self.client.get("/api/bitrix/events")

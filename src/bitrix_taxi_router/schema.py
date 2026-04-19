@@ -69,4 +69,13 @@ CREATE TABLE IF NOT EXISTS diagnostic_logs (
     created_at TEXT NOT NULL,
     FOREIGN KEY (portal_member_id) REFERENCES portals(member_id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_distribution_deal_runtime_portal_updated
+ON distribution_deal_runtime (portal_member_id, updated_at DESC, created_at DESC, deal_id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_distribution_member_runtime_portal_updated
+ON distribution_member_runtime (portal_member_id, updated_at DESC, user_id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_diagnostic_logs_portal_created
+ON diagnostic_logs (portal_member_id, created_at DESC, id DESC);
 """

@@ -18,6 +18,81 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
       distributionStatus.hidden = false;
     }
 
+    function getDistributionTypeLabel(distributionType) {
+      if (distributionType === "round_robin_load_time") {
+        return "По очереди с лимитами по нагрузке и времени";
+      }
+      return distributionType || "Тип распределения не указан";
+    }
+
+    function lookupDistributionUserName(userId) {
+      const users = (distributionState.referenceData && distributionState.referenceData.users) || [];
+      const match = users.find((user) => user.id === userId);
+      return match ? (match.name || userId) : userId;
+    }
+
+    function lookupDistributionStageName(stageId) {
+      const stages = (distributionState.referenceData && distributionState.referenceData.stages) || [];
+      const match = stages.find((stage) => stage.id === stageId);
+      return match ? (match.name || stageId) : stageId;
+    }
+
+    function renderDistributionGroupsPanel() {
+      distributionGroupsList.innerHTML = "";
+      const config = distributionState.config;
+      if (!config) {
+        return;
+      }
+
+      const card = document.createElement("article");
+      card.className = `distribution-group-card${config.is_active ? "" : " is-inactive"}`;
+
+      const header = document.createElement("div");
+      header.className = "distribution-group-card-head";
+
+      const checkbox = document.createElement("span");
+      checkbox.className = "distribution-group-checkbox";
+      checkbox.setAttribute("aria-hidden", "true");
+      checkbox.textContent = config.is_active ? "✓" : "";
+
+      const title = document.createElement("h3");
+      title.className = "distribution-group-title";
+      title.textContent = config.name || "Группа распределения";
+
+      header.append(checkbox, title);
+
+      const subtitle = document.createElement("p");
+      subtitle.className = "distribution-group-subtitle";
+      subtitle.textContent = getDistributionTypeLabel(config.distribution_type);
+
+      const stageName = lookupDistributionStageName(config.distribution_stage_id || "");
+      const memberNames = (Array.isArray(config.members) ? config.members : [])
+        .map((member) => lookupDistributionUserName(member.user_id))
+        .filter(Boolean);
+      const description = document.createElement("p");
+      description.className = "distribution-group-description";
+      description.append("Распределяет сделки в статусе ");
+      const stageStrong = document.createElement("strong");
+      stageStrong.textContent = `«${stageName || "не выбран"}»`;
+      description.append(stageStrong, " между следующими менеджерами: ");
+      const membersStrong = document.createElement("strong");
+      membersStrong.textContent = memberNames.join(", ") || "список пуст";
+      description.append(membersStrong, ".");
+
+      const actions = document.createElement("div");
+      actions.className = "distribution-group-actions";
+
+      const editButton = document.createElement("button");
+      editButton.className = "distribution-group-edit";
+      editButton.type = "button";
+      editButton.textContent = "Изменить";
+      editButton.addEventListener("click", handleEditDistributionGroupClick);
+
+      actions.appendChild(editButton);
+      card.append(header, subtitle, description, actions);
+      distributionGroupsList.appendChild(card);
+    }
+
     function setStatsStatus(message, tone) {
       statsStatus.hidden = false;
       statsStatus.textContent = message;
@@ -412,7 +487,7 @@ GROUPS_PAGE_SCRIPT_RENDER = """    function setDistributionStatus(message, tone)
       } else if (isDistribution) {
         distributionState.openFormRequested = false;
         showDistributionLanding();
-        loadDistributionReferenceData();
+        loadDistributionConfigData(false);
       } else {
         loadStatsData(false);
       }

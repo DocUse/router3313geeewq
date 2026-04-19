@@ -133,6 +133,7 @@ GROUPS_PAGE_MARKUP = """</head>
             </div>
 
             <div class="distribution-groups-panel" id="distributionGroupsPanel">
+              <div class="distribution-groups-list" id="distributionGroupsList"></div>
               <button class="distribution-create-card" id="createDistributionGroupButton" type="button">
                 <span class="distribution-create-plus" aria-hidden="true">+</span>
                 <span class="distribution-create-label">Добавить новую группу</span>
